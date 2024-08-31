@@ -1,6 +1,8 @@
 #ifndef REMOTE_BITBANG_H
 #define REMOTE_BITBANG_H
 
+#include <chrono>
+#include <thread>
 #include <stdint.h>
 #include <sys/types.h>
 

@@ -15,6 +15,8 @@ int main() {
     unsigned char tag_tdo;
 
     while (!remote_bitbang.done()) {
+
+        //fprintf(stderr, "tick\n");
         remote_bitbang.tick(&jtag_tck, &jtag_tms, &jtag_tdi, &jtag_trstn, tag_tdo);
     }
 
