@@ -1,10 +1,13 @@
 #include <iostream>
 
 #include "remote_bitbang.h"
+#include "tap_state_machine.h"
 
 int main() {
 
     //std::cout << "Hello World!";
+
+    extern tsm_state tsm_current_state;
 
     remote_bitbang_t remote_bitbang(3335);
 
@@ -20,7 +23,7 @@ int main() {
         remote_bitbang.tick(&jtag_tck, &jtag_tms, &jtag_tdi, &jtag_trstn, tag_tdo);
 
         // DEBUG
-        tag_tdo = 1;
+        //tag_tdo = 1;
     }
 
     return 0;

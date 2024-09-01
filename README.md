@@ -107,7 +107,7 @@ server on localhost:3335 since this server does not exist yet!
 # Create the server (= mocked target)
 
 ```
-g++ remote_bitbang_main.cpp remote_bitbang.cpp -g
+g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_machine_callback.cpp -g
 ./a.out
 /home/wbi/openocd/bin/openocd -f remote_bitbang.cfg -d -l log
 ```
@@ -148,6 +148,32 @@ swd_write
 
 The commands above are encoded in a more concise format which leads to the single character commands
 that openocd actually sends to the mock server.
+
+```
+// B - Blink on
+// b - Blink off
+// R - Read request
+// Q - Quit request
+// 0 - Write 0 0 0
+// 1 - Write 0 0 1
+// 2 - Write 0 1 0
+// 3 - Write 0 1 1
+// 4 - Write 1 0 0
+// 5 - Write 1 0 1
+// 6 - Write 1 1 0
+// 7 - Write 1 1 1
+// r - Reset 0 0
+// s - Reset 0 1
+// t - Reset 1 0
+// u - Reset 1 1
+// O - SWDIO drive 1
+// o - SWDIO drive 0
+// c - SWDIO read request
+// d - SWD write 0 0
+// e - SWD write 0 1
+// f - SWD write 1 0
+// g - SWD write 1 1
+```
 
 ```
 B b r B b B 2 6 2 6 2 6 2 6 2 6 2 6 2 6 2 b B 2 6 2 6 2 6 0 4 2 6 0 4 0 4 0 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 1 R 5 3 R 7 0 4 0 2 6 2 6 2 6 2 6 2 6 2 6 2 6 2 b B 2 6 2 6 0 4 2 6 2 6 0 4 0 4 0 1 R 5 3 R 7 2 6 0 4 0 b B 2 6 2 6 2 6 2 6 2 6 2 6 2 6 2 b Q Remote end disconnected
