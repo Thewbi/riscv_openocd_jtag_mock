@@ -165,11 +165,13 @@ Reset 0 0 means that the command reset trst srst is performed. trst and srst are
 trst stands for TAP reset and srst for system reset. Both signals are active low. A zero therefore triggers
 the resets.
 
+trst moves the state machine directly into the state Test_Logic_Reset (see https://en.wikipedia.org/wiki/JTAG)
+
 # Resetting the TAP's statemachine to the Test-Logic-Reset state
 
 TAP is the Test Access Port which is the module that the JTAG client (openocd) will talk to. The TAP is the
 device that terminates the JTAG connection coming in from the outside. It will interpret the commands 
-and tranlate them to the necessary interal implementation to cause the system to perform actions.
+and translate them to the necessary interal implementation to cause the system to perform actions.
 
 The TAP has a statemachine which consists of 16 states. The initial state it is in after power on reset is
 unknown. Therefore openocd sends commands to make the state machine transition back to the Test-Logic-Reset
@@ -216,8 +218,97 @@ In concise form, this yields the command sequence
 2 6
 ```
 
+0 - Write tck:0 tms:0 tdi:0     ----- WRITE/CLOCK TMS 0 and TDI 0
+1 - Write tck:0 tms:0 tdi:1 ----- WRITE/CLOCK TDI 1
+2 - Write tck:0 tms:1 tdi:0 ----- WRITE/CLOCK TMS 1
+3 - Write tck:0 tms:1 tdi:1
+4 - Write tck:1 tms:0 tdi:0     ----- WRITE/CLOCK TMS 0 and TDI 0
+5 - Write tck:1 tms:0 tdi:1 ----- WRITE/CLOCK TDI 1
+6 - Write tck:1 tms:1 tdi:0 ----- WRITE/CLOCK TMS 1
+7 - Write tck:1 tms:1 tdi:1    
+
 Looking at the commands which openocd actually sends, there are more than 5 toggles but this
 really does not matter. The TAP state is Test-Logic-Reset in any case.
+
+Assumption: r has placed the state machine into Test-Logic-Reset immediately.
+Also: According to: https://www.fpga4fun.com/JTAG3.html
+> "Unlike for the BYPASS instruction, the IR value for the IDCODE is not standard. Fortunately, each time the TAP controller goes into Test-Logic-Reset, it goes into IDCODE mode (and loads the IDCODE into DR)."
+
+This means that the openocd client does not have to load perform any actions, it will immediately
+find IDCODE inside the DR and can shift it out.
+
+According to this document: https://openocd.org/doc/pdf/openocd.pdf#page=69&zoom=100,120,96
+The DR may contain either IDCODE or BYPASS! It is unknown which is really contained!
+
+State changes on the rising edge, this means when the CLK goes from 0 to 1.
+
+```
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 - clock is set to 0, STATE: Test-Logic-Reset
+b B - LED off, LED on
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+2 6 INPUT: TMS=1, STATE: Test-Logic-Reset
+0 4 INPUT: TMS=0, STATE: Run-Test / Idle
+2 6 INPUT: TMS=1, STATE: SELECT DR-Scan
+0 4 INPUT: TMS=0, STATE: CAPTURE-DR   ------- CAPUTE-DR will load the value of the register (now ICODE) into the shift register!
+0 4 INPUT: TMS=0, STATE: SHIFT-DR
+0 1 INPUT: TMS=0, STATE: SHIFT-DR Data:1 -- shift a one into the shift register and shift out the data to the tdo pin on the other side
+
+R 5 1 TMS=0, STATE: SHIFT-DR
+R 5 1 TMS=0, STATE: SHIFT-DR
+R 5 1 TMS=0, STATE: SHIFT-DR
+...
+```
+
+openocd the decides to blink the LED once more and it keeps resetting the state machine.
+
+```
+b B 2 6 2 6 2 6 
+```
+
+After that it transitions into the SHIFT-DR state. On the way to the SHIFT-DR state
+it passes by the CAPTURE-DR state. Here the value of the register indexed by the IR register which
+is IDCODE after reset, is loaded into the DR register.
+
+```
+0 4 2 6 0 4 0 4 
+```
+
+It then remains in the "SHIFT-DR state" state and then shifts in a one into the DR register on the left
+and shifts out the bits to tdo on the right.
+
+```
+0 1
+```
+After that we get 670 (R 5 1) instructions.
+
+R is the instruction "read request" which writes a single 1 or 0 onto tdo.
+5 and 1 both write the value 1 to the tdi pin and toggle the clock while containing
+a value of 0 for the TMS mode select which makes the state machine stay in the current
+SHIFT-DR state.
+
+5 - Write tck:1 tms:0 tdi:1
+1 - Write tck:0 tms:0 tdi:1
+
+I think this will shift our the entire description stored in the IDCODE register to the tdo pin.
+
+This might be the attempt to write the BYPASS instruction / register address into the
+IR register. But the state machine is not in Shift-IR state! I really do not understand
+what openocd is doing.
+
+```
+Debug: 66 555 command.c:153 script_debug(): command - target names
+Debug: 67 555 command.c:153 script_debug(): command - target names
+
+R 7 0 4 0 2 6 2 6 2 6 2 6 2 6 2 6 2 6 2
+```
 
 
 
@@ -278,7 +369,7 @@ The TJAG client can start to send in a one and count the delays to determine how
 elements are in the daisy chain.
 
 For example if it sends in a 1 and reads a 1, then there is no delay and there are
-not elements in the chain. This is a dumb example since there must be at least one
+no elements in the chain. This is a dumb example since there must be at least one
 element in the chain.
 
 If the client sends in a 1 and reads a 0 and then reads a 1, there is a delay of 1 

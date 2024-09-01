@@ -111,7 +111,9 @@ void remote_bitbang_t::tick(
     if (client_fd > 0)
     {
         //fprintf(stderr, "tick() execute_command()\n");
-        tdo = jtag_tdo; // should the client send the 'R' command, it wants to read the current value of the tdo variable
+
+        // should the client send the 'R' command, it wants to read the current value of the tdo variable
+        tdo = jtag_tdo; 
         execute_command();
     }
     else
@@ -256,7 +258,7 @@ void remote_bitbang_t::execute_command()
         set_pins(1, 1, 0);
         break;
 
-    // 7 - Write tck:1 tms:1 tdi:1;
+    // 7 - Write tck:1 tms:1 tdi:1
     case '7':
         set_pins(1, 1, 1);
         break;
@@ -264,9 +266,9 @@ void remote_bitbang_t::execute_command()
     // R - Read request
     case 'R':
         dosend = 1;
-        tosend = tdo ? '1' : '0';
+        tosend = tdo ? '1' : '0';        
         break;
-        
+
 	// Q - Quit request
     case 'Q':
         quit = 1;
