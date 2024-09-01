@@ -116,7 +116,7 @@ void remote_bitbang_t::tick(
         // fprintf(stderr, "tick() execute_command()\n");
 
         // should the client send the 'R' command, it wants to read the current value of the tdo variable
-        tdo = jtag_tdo;
+        //tdo = jtag_tdo;
         execute_command();
     }
     else
@@ -303,6 +303,9 @@ void remote_bitbang_t::execute_command()
     {
         while (1)
         {
+            // 48d == 0x30 == '0', 49 == 0x31 == '1'
+            fprintf(stderr, "Sending %d\n", tosend);
+
             ssize_t bytes = write(client_fd, &tosend, sizeof(tosend));
             if (bytes == -1)
             {
@@ -327,15 +330,18 @@ void remote_bitbang_t::execute_command()
 
 void remote_bitbang_t::state_entered(tsm_state new_state)
 {
-    fprintf(stderr, "state_entered\n");
+    //fprintf(stderr, "state_entered\n");
 
     switch (new_state) {
 
         // In this state all test-modes (for example extest-mode) are reset, which will disable their operation, allowing the chip to follow its normal operation.
         case TEST_LOGIC_RESET:
             fprintf(stderr, "TEST_LOGIC_RESET entered\n");
+
             // TODO: write IDCODE value into DR!
             // see: https://openocd.org/doc/pdf/openocd.pdf#page=69&zoom=100,120,96
+            instruction_register = Instruction::IDCODE;
+
             break;
 
         // This is the resting state during normal operation.
@@ -343,17 +349,45 @@ void remote_bitbang_t::state_entered(tsm_state new_state)
             fprintf(stderr, "RUN_TEST_IDLE entered\n");
             break;
 
-        // These are the starting states respectively for accessing one of the data registers (the boundary-scan or bypass register in the minimal configuration) or the instruction register.
+        // These are the starting states respectively for accessing one of the data registers 
+        // (the boundary-scan or bypass register in the minimal configuration) or the instruction register.
         case SELECT_DR_SCAN:
             fprintf(stderr, "SELECT_DR_SCAN entered\n");
+
+            // TODO: select the data register which is indexed by the current value of IR
+            // Remember: during TAP reset, IR is preloaded with the index of the IDCODE register!
+            // (Or also possible the bypass register)
+            // 
+            // Lets assume this simulated TAP enters IDCODE into IR on reset. This means during 
+            // SELECT_DR_SCAN, the IDCODE register is selected.
+
+            
+
             break;
         case SELECT_IR_SCAN:
             fprintf(stderr, "SELECT_IR_SCAN entered\n");
             break;
 
-        // These capture the current value of one of the data registers or the instruction register respectively into the scan cells. This is a slight misnomer for the instruction register, since it is usual to capture status information, rather than the actual instruction with Capture-IR.
+        // These capture the current value of one of the data registers or the instruction register respectively 
+        // into the scan cells. This is a slight misnomer for the instruction register, since it is usual 
+        // to capture status information, rather than the actual instruction with Capture-IR.
         case CAPTURE_DR:
             fprintf(stderr, "CAPTURE_DR entered\n");
+
+            // TODO: copy the value in the selected data register into the data shift register
+
+            switch (instruction_register) {
+
+                case Instruction::IDCODE:
+                    id_code_shift_register = id_code_register;
+                    break;
+
+                default:
+                    fprintf(stderr, "[Error] Unknown instruction register!!!\n");
+                    break;
+                
+            }
+
             break;
         case CAPTURE_IR:
             fprintf(stderr, "CAPTURE_IR entered\n");
@@ -361,7 +395,23 @@ void remote_bitbang_t::state_entered(tsm_state new_state)
 
         // Shift a bit in from TDI (on the rising edge of TCK) and out onto TDO (on the falling edge of TCK) from the currently selected data or instruction register respectively.
         case SHIFT_DR:
-            fprintf(stderr, "SHIFT_DR entered\n");
+            //fprintf(stderr, "SHIFT_DR entered\n");
+            fprintf(stderr, "SHIFT_DR entered ");
+
+            // shift the data shift register which places the rightmost bit into tdo for subsequent reads to pick up.
+            switch (instruction_register) {
+
+                case Instruction::IDCODE:
+                    tdo = id_code_shift_register & 0x01;
+                    id_code_shift_register = id_code_shift_register >> 1;
+                    break;
+
+                default:
+                    fprintf(stderr, "[Error] Unknown instruction register!!!\n");
+                    break;
+                
+            }
+
             break;
         case SHIFT_IR:
             fprintf(stderr, "SHIFT_IR entered\n");
