@@ -1,6 +1,8 @@
 #ifndef TAP_STATEMACHINE_CALLBACK_H
 #define TAP_STATEMACHINE_CALLBACK_H
 
+#include <stdint.h>
+
 // see https://www.embecosm.com/appnotes/ean5/html/ch02s01s02.html
 enum tsm_state {
 
@@ -45,7 +47,7 @@ public:
 
     virtual ~TSMStateMachineCallback() {}
     
-    virtual void state_entered(tsm_state new_state) = 0;
+    virtual void state_entered(tsm_state new_state, uint8_t rising_edge_clk) = 0;
 
 };
 

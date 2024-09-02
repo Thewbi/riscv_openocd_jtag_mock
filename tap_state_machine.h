@@ -56,11 +56,12 @@
 class TSMStateMachine {
 
     private:
+
         TSMStateMachineCallback* p_tsm_state_machine_callback;
 
-        tsm_state tsm_current_state;
-
     public:
+
+        tsm_state tsm_current_state;
 
         TSMStateMachine(TSMStateMachineCallback* p_tsm_state_machine_callback);
 
@@ -68,7 +69,7 @@ class TSMStateMachine {
 
         void tsm_force_into_state(tsm_state new_state);
 
-        void transition(uint8_t input);
+        void transition(uint8_t input, uint8_t rising_edge_clk);
 
 };
 

@@ -81,20 +81,55 @@ This configuration file is pretty straightforward.
 As a driver, remote_bitbang is selected. The remote address is localhost:3335.
 The transport protocol to speak is set to jtag (swd is another possible option)
 
-Now start openocd using the configuration file
+This configuration file is more complex:
+
+```
+adapter driver remote_bitbang
+remote_bitbang port 3335
+remote_bitbang host localhost
+
+transport select jtag
+
+# define chipname variable (why the leading underscore?)
+set _CHIPNAME riscv
+jtag newtap $_CHIPNAME cpu -irlen 8
+
+set _TARGETNAME $_CHIPNAME.cpu
+target create $_TARGETNAME riscv -chain-position $_TARGETNAME
+
+gdb_report_data_abort enable
+
+init
+halt
+```
+# Start openocd
+
+Make sure that the mock server is started so that openocd can connect to it.
+
+Now start openocd using the configuration file.
+
+A word about logging levels.
+-d will enable logging level 3.
+-d<level> will allow you to set the logging level.
+
+Level 0 is error messages only; 
+Level 1 adds warnings; 
+Level 2 adds informational messages; 
+Level 3 adds debugging messages; and 
+Level 4 adds verbose low-level debug messages. 
 
 ```
 cd /home/<USERNAME>/dev/openocd/riscv_openocd_jtag_mock
 set JTAG_VPI_PORT=36054;
 set JTAG_DTM_ENABLE_SBA=on; 
-/home/<USERNAME>/openocd/bin/openocd -f remote_bitbang.cfg -d -l log
+/home/<USERNAME>/openocd/bin/openocd -f remote_bitbang.cfg -d4 -l log
 ```
 
 ```
 cd /home/wbi/dev/openocd/riscv_openocd_jtag_mock
 set JTAG_VPI_PORT=36054;
 set JTAG_DTM_ENABLE_SBA=on;
-/home/wbi/openocd/bin/openocd -f remote_bitbang.cfg -d -l log
+/home/wbi/openocd/bin/openocd -f remote_bitbang.cfg -d4 -l log
 ```
 
 openocd will not print to the console since the -l parameter has been passed.
@@ -109,9 +144,8 @@ server on localhost:3335 since this server does not exist yet!
 ```
 g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_machine_callback.cpp -g
 ./a.out
-/home/wbi/openocd/bin/openocd -d -f remote_bitbang.cfg -d -l log
+/home/wbi/openocd/bin/openocd -d -f remote_bitbang.cfg -d4 -l log
 ```
-
 
 # Interpreting the commands that openocd sends
 
@@ -407,3 +441,30 @@ elements in the chain.
 # Move the TAP's state machine to shift-IR state
 
 Therefore it sends 
+
+
+
+
+
+# Reading dtmcontrol
+
+```
+static int riscv_examine(struct target *target)
+{
+	LOG_TARGET_DEBUG(target, "Starting examination");
+	if (target_was_examined(target)) {
+		LOG_TARGET_DEBUG(target, "Target was already examined.");
+		return ERROR_OK;
+	}
+
+	/* Don't need to select dbus, since the first thing we do is read dtmcontrol. */
+
+	RISCV_INFO(info);
+	uint32_t dtmcontrol;
+	if (dtmcontrol_scan(target, 0, &dtmcontrol) != ERROR_OK || dtmcontrol == 0) {
+		LOG_TARGET_ERROR(target, "Could not read dtmcontrol. Check JTAG connectivity/board power.");
+		return ERROR_FAIL;
+	}
+
+    ...
+```

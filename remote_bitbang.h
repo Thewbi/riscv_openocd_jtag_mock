@@ -10,6 +10,7 @@
 
 // instructions / register indexes
 enum class Instruction : uint8_t {
+    //UNKNOWN = 0x00,
     IDCODE = 0x01,
     BYPASS = 0xFF // bypass is all ones as defined inside the specification
 };
@@ -32,7 +33,7 @@ public:
 
     int exit_code() { return err; }
 
-    virtual void state_entered(tsm_state new_state) override;
+    virtual void state_entered(tsm_state new_state, uint8_t rising_edge_clk) override;
 
 private:
 
@@ -65,12 +66,15 @@ private:
     TSMStateMachine tsm_state_machine;
 
     // this is IR
-    Instruction instruction_register;
+    uint8_t instruction_container_register{static_cast<uint8_t>(Instruction::IDCODE)}; // after reset, store IDCODE
 
-    // this is the IDCODE data register which is indexed writing IDCODE into IR
-    //uint32_t id_code_register = 0x05B4603F; // https://onlinedocs.microchip.com/oxy/GUID-C0DEC68F-9589-43E1-B26B-4C3E38933283-en-US-1/GUID-A95CFBC2-41D5-4755-AB8E-B4866693D026.html
-    uint32_t id_code_register = 0x20000c05; // https://community.platformio.org/t/openocd-flash-command-for-risc-v/26038/3
+    uint8_t instruction_shift_register{0};
 
+    // this is the IDCODE container register which is indexed writing IDCODE into IR
+    //uint32_t id_code_container_register = 0x05B4603F; // https://onlinedocs.microchip.com/oxy/GUID-C0DEC68F-9589-43E1-B26B-4C3E38933283-en-US-1/GUID-A95CFBC2-41D5-4755-AB8E-B4866693D026.html
+    //uint32_t id_code_container_register = 0x20000c05; // https://community.platformio.org/t/openocd-flash-command-for-risc-v/26038/3
+    uint32_t id_code_container_register = 0x20000913;
+    
     // this is the IDCODE shift register
     uint32_t id_code_shift_register;
 

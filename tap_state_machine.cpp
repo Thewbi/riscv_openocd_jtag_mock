@@ -15,11 +15,10 @@ void TSMStateMachine::tsm_reset()
 
 void TSMStateMachine::tsm_force_into_state(tsm_state new_state)
 {
-
     fprintf(stderr, "TSM tsm_force_into_state()\n");
     tsm_current_state = new_state;
 
-    p_tsm_state_machine_callback->state_entered(tsm_current_state);
+    p_tsm_state_machine_callback->state_entered(tsm_current_state, 1);
 }
 
 
@@ -63,9 +62,16 @@ void TSMStateMachine::tsm_force_into_state(tsm_state new_state)
            │                               │                            │         
            └───────────────────────────────┴────────────────────────────┘         
 */ 
-void TSMStateMachine::transition(uint8_t input)
+void TSMStateMachine::transition(uint8_t input, uint8_t rising_edge_clk)
 {
+    // on the falling edge, the state machine remains in the current state
+    if (rising_edge_clk == 0) {
+        //fprintf(stderr, "falling_edge\n");
+        p_tsm_state_machine_callback->state_entered(tsm_current_state, rising_edge_clk);
+        return;
+    }
 
+    // on the rising edge, the TAP state machine transitions
     switch (tsm_current_state)
     {
 
@@ -140,5 +146,5 @@ void TSMStateMachine::transition(uint8_t input)
         return;
     }
 
-    p_tsm_state_machine_callback->state_entered(tsm_current_state);
+    p_tsm_state_machine_callback->state_entered(tsm_current_state, rising_edge_clk);
 }
