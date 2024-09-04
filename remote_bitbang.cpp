@@ -11,7 +11,8 @@
 
 #include "remote_bitbang.h"
 
-/////////// remote_bitbang_t
+/// @brief constructor
+/// @param port the port for the server to listen on for new connections.
 remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
                                                     client_fd(0),
                                                     recv_start(0),
@@ -19,6 +20,9 @@ remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
                                                     err(0),
                                                     tsm_state_machine(this)
 {
+    dtmcs_container_register = init_dtmcs();
+    dmi_container_register = init_dmi();
+
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd == -1)
     {
@@ -109,12 +113,8 @@ void remote_bitbang_t::tick(
     unsigned char jtag_tdo     // input from the FPGA system into the JTAG module to transfer back to the client
 )
 {
-    // fprintf(stderr, "tick()\n");
-
     if (client_fd > 0)
     {
-        // fprintf(stderr, "tick() execute_command()\n");
-
         // should the client send the 'R' command, it wants to read the current value of the tdo variable
 
         // Currently do not use the value that the driver (main()) program supplies since it currently is not
@@ -160,7 +160,7 @@ void remote_bitbang_t::reset(char trst, char srst)
 // 7 - Write tck:1 tms:1 tdi:1
 void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
 {
-    fprintf(stderr, "set_pins() retrieved input: tck:%d, tms:%d, tdi:%d\n", _tck, _tms, _tdi);
+    //fprintf(stderr, "set_pins() retrieved input: tck:%d, tms:%d, tdi:%d\n", _tck, _tms, _tdi);
 
     tck = _tck;
     tms = _tms;
@@ -173,6 +173,8 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
 
     } else {
 
+        //fprintf(stderr, "<< %d. ", tdi);
+
         switch (tsm_state_machine.tsm_current_state)
         {
 
@@ -183,23 +185,22 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
                 //fprintf(stderr, "SHIFT_DR entered.\n");
 
                 // shift the data shift register which places the rightmost bit into tdo for subsequent reads to pick up.
-                switch (static_cast<Instruction>(instruction_container_register))
+                switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
                 {
 
-                case Instruction::IDCODE:
+                case RiscV_DTM_Registers::JTAG_IDCODE:
 
-                    //if (rising_edge_clk)
-                    //{
-                        //fprintf(stderr, "SHIFT_DR entered. rising_edge_clk: %d. SHIFT ", rising_edge_clk);
+                    //fprintf(stderr, "SHIFT_DR entered. rising_edge_clk: %d. SHIFT ", rising_edge_clk);
 
-                        // prepare send (which happens on the falling edge of the clock)
-                        // preload the pin with the value that is shifted out from the shift register
-                        tdo = id_code_shift_register & 0x01;
+                    // prepare send (which happens on the falling edge of the clock)
+                    // preload the pin with the value that is shifted out from the shift register
+                    tdo = id_code_shift_register & 0x01;
 
-                        // shift data from the tdi register in
-                        id_code_shift_register = id_code_shift_register >> 1;
-                        id_code_shift_register |= (tdi << (32 - 1)); // size of idcode container register is 32 bits
-                    //}
+                    // shift data from the tdi register in
+                    id_code_shift_register = id_code_shift_register >> 1;
+
+                    // shift in tdi from the left
+                    id_code_shift_register |= (tdi << (32 - 1)); // size of idcode container register is 32 bits
 
                     break;
 
@@ -207,33 +208,72 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
                 //     fprintf(stderr, "[Error] Unknown instruction register!!! BYPASS\n");
                 //     break;
 
+                case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
+                    // fprintf(stderr, "SHIFTING dtcms\n");
+
+                    // ignore first shift (dtmcontrol_scan_via_bscan()Note the starting offset is bit 1, not bit 0.  In BSCAN tunnel, there is a one-bit TCK skew between output and input)
+                    if (!first_shift) {
+
+                        // preload bit to send
+                        tdo = dtmcs_shift_register & 0x01;
+
+                        // shift data from the tdi register in
+                        dtmcs_shift_register = dtmcs_shift_register >> 1;
+
+                        // shift in tdi from the left
+                        dtmcs_shift_register |= (tdi << (32 - 1)); // size of dtmcs container register is 32 bits
+                    }
+                    first_shift = 0;
+                    break;
+
+                case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
+                    fprintf(stderr, "SHIFTING dmi. tdi: %ld\n", tdi);
+
+                    // ignore first shift (dtmcontrol_scan_via_bscan() Note the starting offset is bit 1, not bit 0.  In BSCAN tunnel, there is a one-bit TCK skew between output and input)
+                    //if (first_shift >= 2) {
+
+                        // preload bit to send
+                        tdo = dmi_shift_register & 0x01;
+
+                        // shift data from the tdi register in
+                        dmi_shift_register = dmi_shift_register >> 1;
+
+                        // shift in tdi from the left
+                        dmi_shift_register |= (tdi << (ABITS_LENGTH + (34 - 1))); // size of dmi container register is variable bits
+                    //}
+                    //first_shift = 0;
+
+                    if (first_shift == 41) {
+                        fprintf(stderr, "SHIFTING dmi. tdi: %ld\n", tdi);
+                    }
+
+
+                    first_shift++;
+                    break;
+
                 default:
-                    fprintf(stderr, "[Error] Unknown instruction register!!! %d \n", instruction_container_register);
+                    fprintf(stderr, "[Error] A Unknown instruction register!!! %d \n", instruction_container_register);
                     break;
                 }
 
                 break;
-                
+
             // Shift in a bit from tdi into IR (on the rising edge) and also out from the IR to tdi (on the falling edge)
             case SHIFT_IR:
                 //fprintf(stderr, "SHIFT_IR entered. rising_edge_clk: %d. \n", rising_edge_clk);
                 //fprintf(stderr, "SHIFT_IR entered\n");
 
-                //if (rising_edge_clk)
-                //{
-                    // prepare send (which happens on the falling edge of the clock)
-                    // preload the pin with the value that is shifted out from the shift register
-                    tdo = instruction_shift_register & 0x01;
+                // prepare send (which happens on the falling edge of the clock)
+                // preload the pin with the value that is shifted out from the shift register
+                tdo = instruction_shift_register & 0x01;
 
-                    fprintf(stderr, "Before: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
+                // fprintf(stderr, "Before: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
 
-                    // shift data from the tdi register in
-                    instruction_shift_register = instruction_shift_register >> 1;
-                    instruction_shift_register |= (tdi << (5 - 1)); // size of ircode container register is 5 bits
+                // shift data from the tdi register in
+                instruction_shift_register = instruction_shift_register >> 1;
+                instruction_shift_register |= (tdi << (5 - 1)); // size of ircode container register is 5 bits
 
-                    fprintf(stderr, "After: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
-
-                //}
+                // fprintf(stderr, "After: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
 
             break;
         }
@@ -277,6 +317,8 @@ void remote_bitbang_t::execute_command()
         {
             fprintf(stderr, "No command received\n");
             again = 1;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         else
         {
@@ -285,7 +327,7 @@ void remote_bitbang_t::execute_command()
     }
 
     // fprintf(stderr, "Received a command %c\n", command);
-    fprintf(stderr, "%c ", command);
+    //fprintf(stderr, "%c ", command);
 
     // B - Blink on
     // b - Blink off
@@ -392,8 +434,13 @@ void remote_bitbang_t::execute_command()
     {
         while (1)
         {
-            // 48d == 0x30 == '0', 49 == 0x31 == '1'
-            // fprintf(stderr, "Sending %d\n", tosend);
+            // // 48d == 0x30 == '0', 49 == 0x31 == '1'
+            // //fprintf(stderr, "Sending %d\n", tosend);
+            // if (tosend == 0x30) {
+            //     fprintf(stderr, ">> 0\n");
+            // } else {
+            //     fprintf(stderr, ">> 1\n");
+            // }
 
             ssize_t bytes = write(client_fd, &tosend, sizeof(tosend));
             if (bytes == -1)
@@ -422,28 +469,32 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 {
     // fprintf(stderr, "state_entered\n");
 
+    uint64_t dmi_address = 0x00;
+    uint64_t dmi_data = 0x00;
+    uint64_t dmi_op = 0x00;
+
     switch (new_state)
     {
 
     // In this state all test-modes (for example extest-mode) are reset, which will disable their operation, allowing the chip to follow its normal operation.
     case TEST_LOGIC_RESET:
-        fprintf(stderr, "TEST_LOGIC_RESET entered\n");
+        // fprintf(stderr, "TEST_LOGIC_RESET entered\n");
 
         // TODO: write IDCODE value into DR!
         // see: https://openocd.org/doc/pdf/openocd.pdf#page=69&zoom=100,120,96
-        instruction_container_register = static_cast<uint8_t>(Instruction::IDCODE);
+        instruction_container_register = static_cast<uint8_t>(RiscV_DTM_Registers::JTAG_IDCODE);
 
         break;
 
     // This is the resting state during normal operation.
     case RUN_TEST_IDLE:
-        fprintf(stderr, "RUN_TEST_IDLE entered\n");
+        // fprintf(stderr, "RUN_TEST_IDLE entered\n");
         break;
 
     // These are the starting states respectively for accessing one of the data registers
     // (the boundary-scan or bypass register in the minimal configuration) or the instruction register.
     case SELECT_DR_SCAN:
-        fprintf(stderr, "SELECT_DR_SCAN entered\n");
+        // fprintf(stderr, "SELECT_DR_SCAN entered\n");
 
         // TODO: select the data register.
         //
@@ -463,14 +514,14 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         // The result of all this selecting real registers is that whenever
         break;
     case SELECT_IR_SCAN:
-        fprintf(stderr, "SELECT_IR_SCAN entered\n");
+        // fprintf(stderr, "SELECT_IR_SCAN entered\n");
         break;
 
     // These capture the current value of one of the data registers or the instruction register respectively
-    // into the scan cells. This is a slight misnomer for the instruction register, since it is usual
+    // into the scan cells (= Shift register). This is a slight misnomer for the instruction register, since it is usual
     // to capture status information, rather than the actual instruction with Capture-IR.
     case CAPTURE_DR:
-        fprintf(stderr, "CAPTURE_DR entered\n");
+        // fprintf(stderr, "CAPTURE_DR entered\n");
 
         // TODO: copy the current value stored inside the selected [data container register] into the corresponding
         // [data shift register].
@@ -510,24 +561,42 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         // data that a client will receive from the system will always come from the data shift register and
         // never directly from the data container register.
 
-        switch (static_cast<Instruction>(instruction_container_register))
+        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
         {
 
-        case Instruction::IDCODE:
+        case RiscV_DTM_Registers::JTAG_IDCODE:
             fprintf(stderr, "CAPTURE_DR - capturing IDCODE into id_code_shift_register\n");
             id_code_shift_register = id_code_container_register;
             break;
 
             // TODO case for bypass
 
+        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
+            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DTM_CONTROL_AND_STATUS - capturing dtmcs_container_register into dtmcs_shift_register - ");
+            print_dtmcs(dtmcs_container_register);
+            
+            dtmcs_shift_register = dtmcs_container_register;
+
+            first_shift = 1;
+            break;
+
+        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
+            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DEBUG_MODULE_INTERFACE_ACCESS - capturing dmi_container_register into dmi_shift_register - ");
+            print_dmi(dmi_container_register);
+            
+            dmi_shift_register = dmi_container_register;
+
+            first_shift = 0;
+            break;
+
         default:
-            fprintf(stderr, "[Error] Unknown instruction register!!!\n");
+            fprintf(stderr, "[Error] B Unknown instruction register!!!\n");
             break;
         }
 
         break;
     case CAPTURE_IR:
-        fprintf(stderr, "CAPTURE_IR entered\n");
+        // fprintf(stderr, "CAPTURE_IR entered\n");
 
         // copy data from the IR container register into the IR shift register.
         // the length of the IR register can be specified via the openocd.cfg file.
@@ -538,109 +607,107 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
     // Shift a bit in from TDI (on the rising edge of TCK) and out onto TDO
     // (on the falling edge of TCK) from the currently selected data or instruction register respectively.
     case SHIFT_DR:
-        //fprintf(stderr, "SHIFT_DR entered. rising_edge_clk: %d. ", rising_edge_clk);
-        fprintf(stderr, "SHIFT_DR entered.\n");
-/*
-        // shift the data shift register which places the rightmost bit into tdo for subsequent reads to pick up.
-        switch (static_cast<Instruction>(instruction_container_register))
-        {
-
-        case Instruction::IDCODE:
-
-            if (rising_edge_clk)
-            {
-                fprintf(stderr, "SHIFT_DR entered. rising_edge_clk: %d. SHIFT ", rising_edge_clk);
-
-                // prepare send (which happens on the falling edge of the clock)
-                // preload the pin with the value that is shifted out from the shift register
-                tdo = id_code_shift_register & 0x01;
-
-                // shift data from the tdi register in
-                id_code_shift_register = id_code_shift_register >> 1;
-                id_code_shift_register |= (tdi << (32 - 1)); // size of idcode container register is 32 bits
-            }
-
-            break;
-
-        // case Instruction::BYPASS:
-        //     fprintf(stderr, "[Error] Unknown instruction register!!! BYPASS\n");
-        //     break;
-
-        default:
-            fprintf(stderr, "[Error] Unknown instruction register!!! %d \n", instruction_container_register);
-            break;
-        }
-*/
+        // fprintf(stderr, "SHIFT_DR entered.\n");
+        // the actual shifting is performed on the falling edge
         break;
 
     // Shift in a bit from tdi into IR (on the rising edge) and also out from the IR to tdi (on the falling edge)
     case SHIFT_IR:
-        fprintf(stderr, "SHIFT_IR entered. rising_edge_clk: %d. \n", rising_edge_clk);
-        //fprintf(stderr, "SHIFT_IR entered\n");
-
-/*
-        if (rising_edge_clk)
-        {
-            // prepare send (which happens on the falling edge of the clock)
-            // preload the pin with the value that is shifted out from the shift register
-            tdo = instruction_shift_register & 0x01;
-
-            fprintf(stderr, "Before: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
-
-            // shift data from the tdi register in
-            instruction_shift_register = instruction_shift_register >> 1;
-            instruction_shift_register |= (tdi << (5 - 1)); // size of ircode container register is 5 bits
-
-            fprintf(stderr, "After: tdi: %d instruction_shift_register %d\n", tdi, instruction_shift_register);
-
-        }
-*/
+        // fprintf(stderr, "SHIFT_IR entered. rising_edge_clk: %d. \n", rising_edge_clk);
+        // the actual shifting is performed on the falling edge
         break;
 
     // These are the exit states for the corresponding shift state.
     // From here the state machine can either enter a pause state or enter the update state.
     case EXIT1_DR:
-        fprintf(stderr, "EXIT1_DR entered\n");
+        // fprintf(stderr, "EXIT1_DR entered\n");
         break;
     case EXIT1_IR:
-        fprintf(stderr, "EXIT1_IR entered\n");
+        // fprintf(stderr, "EXIT1_IR entered\n");
         break;
 
     // Pause in shifting data into the data or instruction register.
     // This allows for example test equipment supplying TDO to reload buffers etc.
     case PAUSE_DR:
-        fprintf(stderr, "PAUSE_DR entered\n");
+        // fprintf(stderr, "PAUSE_DR entered\n");
         break;
     case PAUSE_IR:
-        fprintf(stderr, "PAUSE_IR entered\n");
+        // fprintf(stderr, "PAUSE_IR entered\n");
         break;
 
     // These are the exit states for the corresponding pause state.
     // From here the state machine can either resume shifting or enter the update state.
     case EXIT2_DR:
-        fprintf(stderr, "EXIT2_DR entered\n");
+        // fprintf(stderr, "EXIT2_DR entered\n");
         break;
     case EXIT2_IR:
-        fprintf(stderr, "EXIT2_IR entered\n");
+        // fprintf(stderr, "EXIT2_IR entered\n");
         break;
 
-    // The value shifted into the scan cells during the previous states is driven into the chip (from inputs) or onto the interconnect (for outputs).
+    // The value shifted into the scan cells during the previous states is driven into the chip (from inputs) 
+    // or onto the interconnect (for outputs).
     case UPDATE_DR:
-        fprintf(stderr, "UPDATE_DR entered\n");
-        switch (static_cast<Instruction>(instruction_container_register))
+        // fprintf(stderr, "UPDATE_DR entered\n");
+        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
         {
 
-        case Instruction::IDCODE:
+        case RiscV_DTM_Registers::JTAG_IDCODE:
+            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::JTAG_IDCODE\n");
             id_code_container_register = id_code_shift_register;
             break;
 
+        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
+            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS\n");
+
+            // print before the change
+            print_dtmcs(dtmcs_container_register);
+
+            // DEBUG just activate this line again!
+            //dtmcs_container_register = dtmcs_shift_register;
+
+            // print after the change
+            print_dtmcs(dtmcs_container_register);
+            break;
+
+        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
+            fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS\n");
+
+            // print before the change
+            print_dmi(dmi_container_register);
+
+            // DEBUG just activate this line again!
+            dmi_container_register = dmi_shift_register;
+
+            // print after the change
+            print_dmi(dmi_container_register);
+
+            dmi_address = get_dmi_address(dmi_container_register);
+            dmi_data = get_dmi_data(dmi_container_register);
+            dmi_op = get_dmi_op(dmi_container_register);
+
+            fprintf(stderr, "dmi_address: %ld, dmi_data: %ld, dmi_op: %ld\n", dmi_address, dmi_data, dmi_op);
+
+            // dmi_container_register = 0xFFFFFFFF;
+            // dmi_shift_register = 0xFFFFFFFF;
+
+            //dmi_container_register = 0x01;
+            //dmi_shift_register = 0x01;
+
+            //dmi_container_register = (0x01 << 2);
+            //dmi_shift_register = (0x01 << 2);
+
+            //dmi_container_register = 0x07ffffc1;
+            //dmi_shift_register = 0x07ffffc1;
+            break;
+
         default:
-            fprintf(stderr, "[Error] Unknown instruction register!!!\n");
+            fprintf(stderr, "[Error] C Unknown instruction register!!!\n");
             break;
         }
         break;
+
     case UPDATE_IR:
-        fprintf(stderr, "UPDATE_IR entered\n");
+        // fprintf(stderr, "UPDATE_IR entered\n");
         instruction_container_register = instruction_shift_register;
         break;
 
@@ -649,3 +716,171 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         return;
     }
 }
+
+void remote_bitbang_t::print_dtmcs(uint32_t dtmcs) {
+
+    uint8_t errinfo = ((dtmcs >> 0x12) & 0b111);
+    uint8_t dtmhardreset = ((dtmcs >> 0x11) & 0b1);
+    uint8_t dmireset = ((dtmcs >> 0x10) & 0b1);
+    uint8_t idle = ((dtmcs >> 0x0C) & 0b111);
+    uint8_t dmistat = ((dtmcs >> 0x0A) & 0b11);
+    uint8_t abits = ((dtmcs >> 0x04) & 0b111111);
+    uint8_t version = ((dtmcs >> 0x00) & 0b1111);
+
+    fprintf(stderr, "DTMCS: [errinfo: 0x%02x][dtmhardreset: 0x%02x][dmireset: 0x%02x][idle: 0x%02x][dmistat: 0x%02x][abits: 0x%02x][version: 0x%02x]\n",
+        errinfo, dtmhardreset, dmireset, idle, dmistat, abits, version);
+}
+
+/// @brief RISC-V Debug Specification, 1.0.0-rc3, page 93, section 6.1.4
+/// @return default dtmcs value.
+uint32_t remote_bitbang_t::init_dtmcs() {
+    
+    // 0 - (not implemented) not implemented
+    // 1 - (dmi error) there was an error between DTM and DMI
+    // 2 - (communication error) there was an error between DMI and the DMI subordinate
+    // 3 - (device error) The DMI subordinate reported an error
+    // 4 - (unknown) there is no error to report, or no further information available 
+    //     about the error. This is the reset value if the field is implemented
+    uint8_t errinfo = 0x00;
+
+    // Writing 1 to this bit does a hard reset of the DTM, causing
+    // the DTM to forget about any outstanding DMI
+    // transactions, and returning all registers and internal state
+    // to their reset value. In general this should only be used
+    // when the Debugger has reason to expect that the
+    // outstanding DMI transaction will never complete (e.g. a
+    // reset condition caused an inflight DMI transaction to be
+    // cancelled).
+    uint8_t dtmhardreset = 0x00;
+
+    // Writing 1 to this bit clears the sticky error state and resets
+    // errinfo, but does not affect outstanding DMI transactions.
+    uint8_t dmireset = 0x00;
+
+    // This is a hint to the debugger of the minimum number of
+    // cycles a debugger should spend in Run-Test/Idle after
+    // every DMI scan to avoid a `busy' return code (dmistat of 3).
+    // A debugger must still check dmistat when necessary.
+    // 0: It is not necessary to enter Run-Test/Idle at all.
+    // 1: Enter Run-Test/Idle and leave it immediately.
+    // 2: Enter Run-Test/Idle and stay there for 1 cycle before
+    // leaving.
+    // And so on
+    uint8_t idle = 0x00;
+
+    // Read-only alias of op.
+    uint8_t dmistat = 0x00;
+
+    // The size of address in dmi. 
+    uint8_t abits = ABITS_LENGTH;
+
+    // 0 (0.11): Version described in spec version 0.11.
+    // 1 (1.0): Version described in spec versions 0.13 and 1.0.
+    // 15 (custom): Version not described in any available version
+    // of this spec.
+    uint8_t version = 0x01;
+
+    uint32_t dtcms = 
+        ((errinfo & 0b111) << 0x12) | 
+        ((dtmhardreset & 0b1) << 0x11) | 
+        ((dmireset & 0b1) << 0x10) |
+        ((idle & 0b111) << 0x0C) |
+        ((dmistat & 0b11) << 0x0A) |
+        ((abits & 0b111111) << 0x04) | 
+        ((version & 0b1111) << 0x00);
+
+    print_dtmcs(dtcms);
+
+    return dtcms;
+}
+
+void remote_bitbang_t::print_dmi(uint64_t dmi) {
+
+    uint64_t address = ((dmi >> 34) & ABITS_MASK);
+    uint64_t data = ((dmi >> 0x02) & 0xFFFFFFFF);
+    uint64_t op = ((dmi >> 0x00) & 0b11);
+
+    fprintf(stderr, "DMI: [address: 0x%02lx][data: 0x%08lx][op: 0x%02lx]\n",
+        address, data, op);
+}
+
+uint64_t remote_bitbang_t::init_dmi() {
+
+    // Address used for DMI access. In Update-DR this value is
+    // used to access the DM over the DMI. op defines what this
+    // register contains after every possible operation.
+    uint64_t address = 0x00;
+
+    // The data to send to the DM over the DMI during UpdateDR, and the data 
+    // returned from the DM as a result of the previous operation.
+    uint64_t data = 0x00;
+
+    // When the debugger writes this field, it has the following meaning:
+    //
+    // 0 (nop): Ignore data and address. Don’t send anything over the DMI during Update-DR. This
+    // operation should never result in a busy or error response.
+    // The address and data reported in the following CaptureDR are undefined.
+    // This operation leaves the values in address and data
+    // UNSPECIFIED.
+    //
+    // 1 (read): Read from address. When this operation succeeds, address contains the
+    // address that was read from, and data contains the value
+    // that was read.
+    //
+    // 2 (write): Write data to address. This operation leaves the values in address and data
+    // UNSPECIFIED.
+    //
+    // 3 (reserved): Reserved.
+    //
+    //
+    //
+    // When the debugger reads this field, it means the following:
+    //
+    // 0 (success): The previous operation completed successfully.
+    //
+    // 1 (reserved): Reserved.
+    //
+    // 2 (failed): A previous operation failed. The data scanned
+    // into dmi in this access will be ignored. This status is sticky
+    // and can be cleared by writing dmireset in dtmcs.
+    // This indicates that the DM itself or the DMI responded
+    // with an error. There are no specified cases in which the
+    // DM would respond with an error, and DMI is not required
+    // to support returning errors.
+    // If a debugger sees this status, there might be additional
+    // information in errinfo.
+    //
+    // 3 (busy): An operation was attempted while a DMI request
+    // is still in progress. The data scanned into dmi in this
+    // access will be ignored. This status is sticky and can be
+    // cleared by writing dmireset in dtmcs. If a debugger sees
+    // this status, it needs to give the target more TCK edges
+    // between Update-DR and Capture-DR. The simplest way to
+    // do that is to add extra transitions in Run-Test/Idle.
+    uint64_t op = 0x00;
+
+    uint64_t dmi = 
+        ((address & ABITS_MASK) << 34) |
+        ((data & 0xFFFFFFFF) << 0x02) | 
+        ((op & 0b11) << 0x00);
+
+    print_dmi(dmi);
+
+    return dmi;
+}
+
+uint64_t remote_bitbang_t::get_dmi_address(uint64_t dmi) {
+    uint64_t address = ((dmi >> 34) & ABITS_MASK);
+    return address;
+}
+
+uint64_t remote_bitbang_t::get_dmi_data(uint64_t dmi) {
+    uint64_t data = ((dmi >> 0x2) & 0xFFFFFFFF);
+    return data;
+}
+
+uint64_t remote_bitbang_t::get_dmi_op(uint64_t dmi) {
+    uint64_t op = ((dmi >> 0x00) & 0b11);
+    return op;
+}
+

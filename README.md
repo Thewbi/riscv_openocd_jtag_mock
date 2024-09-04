@@ -468,3 +468,88 @@ static int riscv_examine(struct target *target)
 
     ...
 ```
+
+
+# VSCode openocd launch configuration for debugging
+
+```
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/home/wbi/openocd/bin/openocd",
+            "cwd": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock",
+            "args": ["-d", "-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
+            "stopAtEntry": true,
+            "launchCompleteCommand": "exec-run",
+            "linux": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+              "MIMode": "lldb"
+            },
+            "windows": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "C:\\MinGw\\bin\\gdb.exe"
+            }
+          }
+    ]
+}
+```
+
+## VSCode mock launch configuration for debugging
+
+```
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock/a.out",
+            "cwd": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock",
+            //"args": ["-d", "-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
+            "stopAtEntry": true,
+            "launchCompleteCommand": "exec-run",
+            "linux": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+              "MIMode": "lldb"
+            },
+            "windows": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "C:\\MinGw\\bin\\gdb.exe"
+            }
+          }
+    ]
+}
+```
+
+
+
+
+## Resetting the DM
+
+Through the DMI register, the external debugger (ED) can talk to the RISC-V DM.
+
+
+```
+Debug: 274 676 riscv-013.c:537 check_dbgbase_exists(): [riscv.cpu0] Searching for DM with DMI base address (dbgbase) = 0x0
+``` 
+
+```
+Debug: 338 995 riscv-013.c:1817 reset_dm(): [riscv.cpu0] Initiating DM reset.
+```
