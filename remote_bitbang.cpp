@@ -523,8 +523,28 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             // AXI, AMBA, .... First the command to execute a read operation is sent to the DebugModuleInterface (DMI)
             // which then talks to the DebugModule (DM) over the bus to access a register.
 
+
+            // 0x04 (Abstract Data 0 (data0))
+            if (dmi_address == 0x04) {
+
+                // data 0 through data 11 (Registers data 0 - data 11) are registers that may
+                // be read or changed by abstract commands. datacount indicates how many 
+                // of them are implemented, starting at data0 counting up. 
+                //
+                // Table 2 shows how abstract commands use these registers.
+            
+            } // 0x05 (Abstract Data 1 (data1))
+            else if (dmi_address == 0x05) {
+
+                // data 0 through data 11 (Registers data 0 - data 11) are registers that may
+                // be read or changed by abstract commands. datacount indicates how many 
+                // of them are implemented, starting at data0 counting up. 
+                //
+                // Table 2 shows how abstract commands use these registers.
+            
+            }
             // 0x10 == DebugModule Control Register (DebugSpec, Page 26 and Page 30)
-            if (dmi_address == 0x10) {
+            else if (dmi_address == 0x10) {
                 
                 // read operation
                 if ((dmi_address == 0x10) && (dmi_op == 0x01)) {
@@ -546,18 +566,18 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         (ndmreset << 1) |
                         (dmactive << 0);
 
-                        // success, the operation 0x00 used in a response is interpreted by openocd
-                        // as a successfull termination of the requested operation
-                        dmi_op = 0x00;
+                    // success, the operation 0x00 used in a response is interpreted by openocd
+                    // as a successfull termination of the requested operation
+                    dmi_op = 0x00;
 
-                        // set a value into the dmi_container_register
-                        dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
-                            ((debug_module_control & 0xFFFFFFFF) << 2) | 
-                            ((dmi_op & 0b11) << 0);
+                    // set a value into the dmi_container_register
+                    dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                        ((debug_module_control & 0xFFFFFFFF) << 2) | 
+                        ((dmi_op & 0b11) << 0);
 
-                        // // DEBUG
-                        // fprintf(stderr, "Outgoing dmi_control_register after READ: ");
-                        // print_dmi(dmi_container_register);
+                    // // DEBUG
+                    // fprintf(stderr, "Outgoing dmi_control_register after READ: ");
+                    // print_dmi(dmi_container_register);
 
                 }  
                 // write operation
@@ -792,6 +812,169 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                 // after this, in the logs of openocd (log level -d4) there should be an output similar to this:
                 // "Debug: 2755 50698 riscv-013.c:411 riscv_log_dmi_scan(): read: dmstatus=0x283 {version=1_0 authenticated=true allhalted=1}"
+            
+            } // 3.14.6. Abstract Control and Status (abstractcs, at 0x16)
+            else if (dmi_address == 0x16) {
+
+                // read operation
+                if (dmi_op == 0x01) {
+
+                    // construct the response
+                    uint32_t abstractcs_container_register = 
+                        (progbufsize << 24) |
+                        (busy << 12) |
+                        (relaxedpriv << 11) |
+                        (cmderr << 8) |
+                        (datacount << 0);
+
+                    // success, the operation 0x00 used in a response is interpreted by openocd
+                    // as a successfull termination of the requested operation
+                    dmi_op = 0x00;
+
+                    // set a value into the dmi_container_register
+                    dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                        ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
+                        ((dmi_op & 0b11) << 0);
+
+                    // // DEBUG
+                    // fprintf(stderr, "Outgoing dmi_control_register after READ: ");
+                    // print_dmi(dmi_container_register);
+
+                // write operation
+                } else if (dmi_op == 0x02) {
+
+                    // Writing this register while an abstract command is executing causes cmderr to become 1 (busy) once
+                    // the command completes (busy becomes 0).
+
+                    // progbufsize
+                    //progbufsize = 0x00;
+
+                    // 0 (ready): There is no abstract command currently being executed.
+                    // 1 (busy): An abstract command is currently being executed
+                    //busy = 0x00;
+
+                    // This optional bit controls whether program buffer and
+                    // abstract memory accesses are performed with the exact
+                    // and full set of permission checks that apply based on the
+                    // current architectural state of the hart performing the
+                    // access, or with a relaxed set of permission checks (e.g. PMP
+                    // restrictions are ignored). The details of the latter are
+                    // implementation-specific.
+                    // 0 (full checks): Full permission checks apply.
+                    // 1 (relaxed checks): Relaxed permission checks apply
+                    //relaxedpriv = 0x00;
+
+                    // Gets set if an abstract command fails. The bits in this field
+                    // remain set until they are cleared by writing 1 to them. No
+                    // abstract command is started until the value is reset to 0.
+                    // This field only contains a valid value if busy is 0.
+                    // 0 (none): No error.
+                    // 1 (busy): An abstract command was executing while
+                    // command, abstractcs, or abstractauto was written, or when
+                    // one of the data or progbuf registers was read or written.
+                    // This status is only written if cmderr contains 0.
+                    // 2 (not supported): The command in command is not
+                    // supported. It may be supported with different options set,
+                    // but it will not be supported at a later time when the hart or
+                    // system state are different.
+                    // 3 (exception): An exception occurred while executing the
+                    // command (e.g. while executing the Program Buffer).
+                    // 4 (halt/resume): The abstract command couldn’t execute
+                    // because the hart wasn’t in the required state
+                    // (running/halted), or unavailable.
+                    // 5 (bus): The abstract command failed due to a bus error
+                    // (e.g. alignment, access size, or timeout).
+                    // 6 (reserved): Reserved for future use.
+                    // 7 (other): The command failed for another reason.
+                    //cmderr = 0x00;
+
+                    // Number of data registers that are implemented as part of
+                    // the abstract command interface. Valid sizes are 1 — 12.
+                    //datacount = 0x00;
+
+                    abstractcs_container_register = ((progbufsize & 0b11111) << 24) | 
+                        ((busy & 0b1) << 12) |
+                        ((relaxedpriv & 0b1) << 11) |
+                        ((cmderr & 0b111) << 8) |
+                        ((datacount & 0b1111) << 0);
+
+                }
+
+            } // 3.14.7. Abstract Command (command, at 0x17)
+            else if (dmi_address == 0x17) {
+
+                // Register 0x17 is first written to start an abstract command to read a register for example.
+                // Register 0x16 is then polled to see if the command has terminated
+                // the resulting value is then read from register 0x04 for 32 bit and from
+                // register 0x04 and 0x05 for 64 bit.
+
+                // read operation
+                if (dmi_op == 0x01) {
+
+                    //fprintf(stderr, "\nAbstract Command READ\n");
+
+                    // The type determines the overall functionality of this abstract command.
+                    uint32_t cmdtype = 0x00;
+
+                    // This field is interpreted in a command-specific manner, described for each abstract command.
+                    uint32_t control = 0x00;
+
+                // write operation
+                } else if (dmi_op == 0x02) {
+
+                    //fprintf(stderr, "\nAbstract Command WRITE\n");
+
+                    // Writes to this register cause the corresponding abstract command to be executed.
+                    //
+                    // Writing this register while an abstract command is executing causes cmderr to become 1 (busy) once
+                    // the command completes (busy becomes 0).
+                    //
+                    // If cmderr is non-zero, writes to this register are ignored.
+                    //
+                    // cmderr inhibits starting a new command to accommodate debuggers that, for
+                    // performance reasons, send several commands to be executed in a row without checking
+                    // cmderr in between. They can safely do so and check cmderr at the end without worrying
+                    // that one command failed but then a later command (which might have depended on the
+                    // previous one succeeding) passed.
+
+                    //cmderr = 0x01;
+                    cmderr = 0x00;
+                    
+                    // cmdtype: 0, control: 3280904
+                    uint32_t cmdtype = ((dmi_data >> 24) & 0xFF);
+                    uint32_t control = ((dmi_data >> 0) & 0xFFFFFF);
+
+                    //fprintf(stderr, "\ncmdtype: %d, control: %d\n", cmdtype, control);
+
+                    if (cmdtype == 0x00) {
+
+                        // 3.7.1.1. Access Register, page 18
+                        //fprintf(stderr, "\nACCESS REGISTER COMMAND\n");
+
+                        uint32_t regno = (control >> 0) & 0xFF;
+                        uint32_t write = (control >> 16) & 0x01;
+                        uint32_t transfer = (control >> 17) & 0x01;
+                        uint32_t postexec = (control >> 18) & 0x01;
+                        uint32_t aarpostincrement = (control >> 19) & 0x01;
+                        uint32_t aarsize = (control >> 20) & 0b111;
+
+                        if ((regno != 0x01) && (regno != 0x08)) {
+                            fprintf(stderr, "\nACCESS REGISTER COMMAND regno:%d\n", regno);
+                        }
+
+                    } else if (cmdtype == 0x01) {
+
+                        // 3.7.1.2. Quick Access
+                        //fprintf(stderr, "\nQUICK_ACCESS\n");
+
+                    } else if (cmdtype == 0x02) {
+
+                        // 3.7.1.3. Access Memory
+                        // fprintf(stderr, "\nACCESS_MEMORY_COMMAND\n");
+                        
+                    }
+
+                }
             
             } else {
 

@@ -564,6 +564,14 @@ Debug: 9366 14598 riscv.c:3684 riscv_openocd_poll(): [riscv.cpu0] Polling all ha
 ```
 
 ```
+Debug: 2959 22657 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register misa
+Debug: 3377 31740 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register vlenb
+Debug: 3382 36152 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register mstatus
+Debug: 4891 45706 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register mtopi
+Debug: 5308 53308 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register mtopei
+Debug: 5727 62459 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register dcsr
+Debug: 2959 22657 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register misa
+
 Debug: 436 9660 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register zero
 Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register ra
 Debug: 471 10856 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register sp
@@ -574,6 +582,7 @@ Debug: 539 13272 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading 
 Debug: 556 13876 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t2
 Debug: 573 14480 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register fp
 Debug: 590 15084 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s1
+
 Debug: 607 15688 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a0
 Debug: 624 16292 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a1
 Debug: 641 16896 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a2
@@ -582,18 +591,24 @@ Debug: 675 18104 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading 
 Debug: 692 18708 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a5
 Debug: 709 19312 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a6
 Debug: 726 19916 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a7
+
 Debug: 743 20520 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s2
 Debug: 760 21124 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s3
 Debug: 777 21728 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s4
 Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s5
-...
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s6
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s7
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s8
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s9
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s10
 Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s11
+
 Debug: 913 26560 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t3
-...
+Debug: 913 26560 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t4
+Debug: 913 26560 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t5
 Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t6
+
 Debug: 981 28972 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register dpc
-
-
 ```
 
 
@@ -601,6 +616,7 @@ Debug: 981 28972 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading 
 ## GNU Debugger (gdb)
 
 Start gdb:
+
 ```
 gdb
 ```
@@ -614,6 +630,12 @@ target extended-remote localhost:3333
 
 ```
 info registers
+```
+
+Stop gdb:
+
+```
+quit
 ```
 
 
@@ -630,6 +652,48 @@ Working:
 ```
 jtag names
 riscv info
+
+// reading riscv registers (by ABI name)
+get_reg zero
+get_reg ra
+get_reg sp
+get_reg gp
+// similar with the ABI names: tp, t0-t6, fp, a0-a7, s1-s11, dpc
+//
+// register index | register abi name
+// 0              | zero
+// 1              | ra
+// 2              | sp
+// 3              | gp
+// 4              | tp
+// 5              | t0
+// 6              | t1
+// 7              | t2
+// 8              | fp
+// 9              | s1
+// 10             | a0
+// 11             | a1
+// 12             | a2
+// 13             | a3
+// 14             | a4
+// 15             | a5
+// 16             | a6
+// 17             | a7
+// 18             | s2
+// 19             | s3
+// 20             | s4
+// 21             | s5
+// 22             | s6
+// 23             | s7
+// 24             | s8
+// 25             | s9
+// 26             | s10
+// 27             | s11
+// 28             | t3
+// 29             | t4
+// 30             | t5
+// 31             | t6
+
 
 // reading DebugModuleInterface (DMI) registers
 ???

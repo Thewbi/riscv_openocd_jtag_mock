@@ -147,6 +147,9 @@ private:
     //uint32_t status_container_register{0};
     //uint32_t status_shift_register{0};
 
+    uint32_t abstractcs_container_register{0};
+    uint32_t abstractcs_shift_register{0};
+
     uint8_t shift_amount{0};
 
     /// @brief Check for a client connecting, and accept if there is one.
@@ -189,6 +192,9 @@ private:
 
     std::string dm_register_as_string(uint32_t address);
 
+    //
+    // these variables all belong to the register 0x10 == DebugModule Control Register (DebugSpec, Page 26 and Page 30)
+    //
 
     uint32_t haltreq = 0x00; // writing 0 clears the halt request for all currently selected harts. This may cancal outstanding halt requests for those harts.
     uint32_t resumereq = 0x00;
@@ -204,6 +210,59 @@ private:
     uint32_t clrresethaltreq = 0x00;
     uint32_t ndmreset = 0x00;
     uint32_t dmactive = 0x00; // 0x00 module needs reset, 0x01 module functions normally.
+
+    //
+    // these variables all belong to the register 3.14.6. Abstract Control and Status (abstractcs, at 0x16)
+    //
+
+    // Writing this register while an abstract command is executing causes cmderr to become 1 (busy) once
+    // the command completes (busy becomes 0).
+
+    // progbufsize
+    uint32_t progbufsize = 0x00;
+
+    // 0 (ready): There is no abstract command currently being executed.
+    // 1 (busy): An abstract command is currently being executed
+    uint32_t busy = 0x00;
+
+    // This optional bit controls whether program buffer and
+    // abstract memory accesses are performed with the exact
+    // and full set of permission checks that apply based on the
+    // current architectural state of the hart performing the
+    // access, or with a relaxed set of permission checks (e.g. PMP
+    // restrictions are ignored). The details of the latter are
+    // implementation-specific.
+    // 0 (full checks): Full permission checks apply.
+    // 1 (relaxed checks): Relaxed permission checks apply
+    uint32_t relaxedpriv = 0x00;
+
+    // Gets set if an abstract command fails. The bits in this field
+    // remain set until they are cleared by writing 1 to them. No
+    // abstract command is started until the value is reset to 0.
+    // This field only contains a valid value if busy is 0.
+    // 0 (none): No error.
+    // 1 (busy): An abstract command was executing while
+    // command, abstractcs, or abstractauto was written, or when
+    // one of the data or progbuf registers was read or written.
+    // This status is only written if cmderr contains 0.
+    // 2 (not supported): The command in command is not
+    // supported. It may be supported with different options set,
+    // but it will not be supported at a later time when the hart or
+    // system state are different.
+    // 3 (exception): An exception occurred while executing the
+    // command (e.g. while executing the Program Buffer).
+    // 4 (halt/resume): The abstract command couldn’t execute
+    // because the hart wasn’t in the required state
+    // (running/halted), or unavailable.
+    // 5 (bus): The abstract command failed due to a bus error
+    // (e.g. alignment, access size, or timeout).
+    // 6 (reserved): Reserved for future use.
+    // 7 (other): The command failed for another reason.
+    uint32_t cmderr = 0x00;
+
+    // Number of data registers that are implemented as part of
+    // the abstract command interface. Valid sizes are 1 — 12.
+    uint32_t datacount = 0x00;
 };
 
 #endif
