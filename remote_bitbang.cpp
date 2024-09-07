@@ -386,7 +386,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         {
 
         case RiscV_DTM_Registers::JTAG_IDCODE:
-            fprintf(stderr, "CAPTURE_DR - capturing IDCODE into id_code_shift_register\n");
+            fprintf(stderr, "\nCAPTURE_DR - capturing IDCODE into id_code_shift_register\n");
             id_code_shift_register = id_code_container_register;
             shift_amount = 0;
             break;
@@ -394,15 +394,17 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             // TODO case for bypass
 
         case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
-            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DTM_CONTROL_AND_STATUS - capturing dtmcs_container_register into dtmcs_shift_register - ");
+            fprintf(stderr, "\nCAPTURE_DR - RISCV_DTM_REGISTERS::DTM_CONTROL_AND_STATUS - capturing dtmcs_container_register into dtmcs_shift_register - ");
             print_dtmcs(dtmcs_container_register);
             dtmcs_shift_register = dtmcs_container_register;
             shift_amount = 0;
             break;
 
         case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
-            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DEBUG_MODULE_INTERFACE_ACCESS - capturing dmi_container_register into dmi_shift_register - ");
+#ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
+            fprintf(stderr, "\nCAPTURE_DR - RISCV_DTM_REGISTERS::DEBUG_MODULE_INTERFACE_ACCESS - capturing dmi_container_register into dmi_shift_register - ");
             print_dmi(dmi_container_register);
+#endif
             dmi_shift_register = dmi_container_register;
             shift_amount = 0;
             break;
@@ -493,23 +495,29 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         // 
         case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
 
-            fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS\n");
+#ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
+            fprintf(stderr, "\nUPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS\n");
 
             // DEBUG print before the change
             print_dmi(dmi_container_register);
+#endif
 
             // TODO I think this makes no sense
             if (dmi_shift_register != 0x00) {
                 dmi_container_register = dmi_shift_register;
+
+#ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
                 // print after the change
                 print_dmi(dmi_container_register);
+#endif
             }
 
             dmi_address = get_dmi_address(dmi_container_register);
             dmi_data = get_dmi_data(dmi_container_register);
             dmi_op = get_dmi_op(dmi_container_register);
 
-            fprintf(stderr, "dmi_address: %ld, dmi_data: %ld, dmi_op: %ld (%s)\n", dmi_address, dmi_data, dmi_op, operation_as_string(dmi_op).c_str());
+            // DEBUG
+            //fprintf(stderr, "dmi_address: %ld, dmi_data: %ld, dmi_op: %ld (%s)\n", dmi_address, dmi_data, dmi_op, operation_as_string(dmi_op).c_str());
 
             // The user accesses the registers inside the DebugModule over the DebugBus which might be
             // AXI, AMBA, .... First the command to execute a read operation is sent to the DebugModuleInterface (DMI)
@@ -547,9 +555,9 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             ((debug_module_control & 0xFFFFFFFF) << 2) | 
                             ((dmi_op & 0b11) << 0);
 
-                        // DEBUG
-                        fprintf(stderr, "Outgoing dmi_control_register after READ: ");
-                        print_dmi(dmi_container_register);
+                        // // DEBUG
+                        // fprintf(stderr, "Outgoing dmi_control_register after READ: ");
+                        // print_dmi(dmi_container_register);
 
                 }  
                 // write operation
@@ -626,9 +634,9 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             ((debug_module_control & 0xFFFFFFFF) << 2) | 
                             ((dmi_op & 0b11) << 0);
 
-                        // DEBUG
-                        fprintf(stderr, "Outgoing dmi_control_register after WRITE: ");
-                        print_dmi(dmi_container_register);
+                        // // DEBUG
+                        // fprintf(stderr, "Outgoing dmi_control_register after WRITE: ");
+                        // print_dmi(dmi_container_register);
                     }
                     else if (hasel == 1) {
 
@@ -666,7 +674,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         dmactive = 1;
 
                         // only a single hart exists, set only the very first bit in hartsello
-                        hartsello = 1;
+                        //hartsello = 1;
+                        hartsello = 0;
                         hartselhi = 0;
 
                         // construct the response
@@ -699,9 +708,94 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                 }
 
+            } 
+            // 0x11 == DebugModule Status (DebugSpec, Page 28) - 3.14.1 Debug Module Status
+            else if (dmi_address == 0x11) {
+
+#ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
+                fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Status Register (0x11) \n");
+
+                // read operation
+                if (dmi_op == 0x01) {
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Status Register (0x11) READ \n");
+                } else if (dmi_op == 0x02) {
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Status Register (0x11) WRITE \n");
+                }
+#endif
+
+                uint32_t ndmresetpending = 0x00;
+                uint32_t stickyunavail = 0x00;
+                uint32_t impebreak = 0x00;
+                uint32_t allhavereset = 0x00;
+                uint32_t anyhavereset = 0x00;
+                uint32_t allresumeack = 0x00;
+                uint32_t anyresumeack = 0x00;
+                uint32_t allnonexistent = 0x00;
+                uint32_t anynonexistent = 0x00;
+                uint32_t allunavail = 0x00;
+                uint32_t anyunavail = 0x00;
+                uint32_t allrunning = 0x00;
+                uint32_t anyrunning = 0x00;
+
+                // set allhalted to true since this is a sensical way to make the openocd source code to return
+                // an OK status for the method riscv013_get_hart_state() in src/target/riscv/riscv-013.c
+                uint32_t allhalted = 0x01;
+                uint32_t anyhalted = 0x00;
+
+                // automatically authenticate the debugger as otherwise openocd goes into failure and outputs
+                // this message: "Debugger is not authenticated to target Debug Module. (dmstatus=0x3). Use `riscv authdata_read` and `riscv authdata_write` commands to authenticate."
+                uint32_t authenticated = 0x01;
+
+                uint32_t authbusy = 0x00;
+                uint32_t hasresethaltreq = 0x00;
+                uint32_t confstrptrvalid = 0x00;
+
+                // into version, enter either 2 or 3 since openocd will err out if not compatible version is returned
+                // openocd for riscv supports the version constants 2 or 3
+                // 2 stands for 0.13 and 3 stands for 1.0
+                // see riscv_examine() in src/target/riscv/riscv.c in the openocd source code.
+                uint32_t version = 0x03;
+            
+                // construct the response
+                uint64_t debug_module_status = 
+                    (ndmresetpending << 24) |
+                    (stickyunavail << 23) |
+                    (impebreak << 22) |
+                    (allhavereset << 19) |
+                    (anyhavereset << 18) |
+                    (allresumeack << 17) |
+                    (anyresumeack << 16) |
+                    (allnonexistent << 15) |
+                    (anynonexistent << 14) |
+                    (allunavail << 13) |
+                    (anyunavail << 12) |
+                    (allrunning << 11) |
+                    (anyrunning << 10) |
+                    (allhalted << 9) |
+                    (anyhalted << 8) |
+                    (authenticated << 7) |
+                    (authbusy << 6) |
+                    (hasresethaltreq << 5) |
+                    (confstrptrvalid << 4) |
+                    (version << 0);
+
+                //status_container_register = debug_module_status;
+
+                // success, the operation 0x00 used in a response is interpreted by openocd
+                // as a successfull termination of the requested operation
+                dmi_op = 0x00;
+
+                // set a value into the dmi_container_register
+                dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                    ((debug_module_status & 0xFFFFFFFF) << 2) | 
+                    ((dmi_op & 0b11) << 0);
+
+                // after this, in the logs of openocd (log level -d4) there should be an output similar to this:
+                // "Debug: 2755 50698 riscv-013.c:411 riscv_log_dmi_scan(): read: dmstatus=0x283 {version=1_0 authenticated=true allhalted=1}"
+            
             } else {
 
-                fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS -- [ERROR] UNKNOWN dmi_address!!!\n");
+                fprintf(stderr, "\nUPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS -- [ERROR] UNKNOWN dmi_address!!! 0x%02lx (%s) \n", dmi_address, dm_register_as_string(dmi_address).c_str());
 
             }
             break;
@@ -803,12 +897,12 @@ void remote_bitbang_t::execute_command()
 
     // B - Blink on
     case 'B':
-        fprintf(stderr, "*BLINK ON*\n");
+        //fprintf(stderr, "*BLINK ON*\n");
         break;
 
     // b - Blink off
     case 'b': /* fprintf(stderr, "_______\n"); */
-        fprintf(stderr, "*BLINK off*\n");
+        //fprintf(stderr, "*BLINK off*\n");
         break;
 
     // r - Reset 0 0
@@ -877,6 +971,8 @@ void remote_bitbang_t::execute_command()
     {
         while (1)
         {
+
+#ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
             // // 48d == 0x30 == '0', 49 == 0x31 == '1'
             // //fprintf(stderr, "Sending %d\n", tosend);
             if (tosend == 0x30) {
@@ -884,6 +980,7 @@ void remote_bitbang_t::execute_command()
             } else {
                  fprintf(stderr, "1 ");
             }
+#endif
 
             ssize_t bytes = write(client_fd, &tosend, sizeof(tosend));
             if (bytes == -1)
@@ -1086,6 +1183,174 @@ std::string remote_bitbang_t::operation_as_string(uint64_t dmi_op) {
 
         case 2:
             return std::string("WRITE");
+
+        default:
+            return std::string("UNKNOWN");
+    }
+}
+
+std::string remote_bitbang_t::dm_register_as_string(uint32_t address) {
+    switch (address) {
+
+        case 0x04: 
+            return std::string("Abstract Data 0 (data0)");
+        case 0x05:
+            return std::string("Abstract Data 1 (data1)");
+        case 0x06:
+            return std::string("Abstract Data 2 (data2)");
+        case 0x07:
+            return std::string("Abstract Data 3 (data3)");
+        case 0x08:
+            return std::string("Abstract Data 4 (data4)");
+        case 0x09:
+            return std::string("Abstract Data 5 (data5)");
+        case 0x0a:
+            return std::string("Abstract Data 6 (data6)");
+        case 0x0b:
+            return std::string("Abstract Data 7 (data7)");
+        case 0x0c:
+            return std::string("Abstract Data 8 (data8)");
+        case 0x0d:
+            return std::string("Abstract Data 9 (data9)");
+        case 0x0e:
+            return std::string("Abstract Data 10 (data10)");
+        case 0x0f:
+            return std::string("Abstract Data 11 (data11)");
+
+        case 0x10:
+            return std::string("Debug Module Control (dmcontrol)");
+        case 0x11:
+            return std::string("Debug Module Status (dmstatus)");
+        case 0x12:
+            return std::string("Hart Info (hartinfo)");
+        case 0x13:
+            return std::string("Halt Summary 1 (haltsum1)");
+        case 0x14:
+            return std::string("Hart Array Window Select (hawindowsel)");
+        case 0x15:
+            return std::string("Hart Array Window (hawindow)");
+        case 0x16:
+            return std::string("Abstract Control and Status (abstractcs)");
+        case 0x17:
+            return std::string("Abstract Command (command)");
+        case 0x18:
+            return std::string("Abstract Command Autoexec (abstractauto)");
+        case 0x19:
+            return std::string("Configuration Structure Pointer 0 (confstrptr0)");
+        case 0x1a:
+            return std::string("Configuration Structure Pointer 1 (confstrptr1)");
+        case 0x1b:
+            return std::string("Configuration Structure Pointer 2 (confstrptr2)");
+        case 0x1c:
+            return std::string("Configuration Structure Pointer 3 (confstrptr3)");
+        case 0x1d:
+            return std::string("Next Debug Module (nextdm)");
+        //case 0x1e:
+        //    return std::string("");
+        case 0x1f:
+            return std::string("Custom Features (custom)");
+
+        case 0x20:
+            return std::string("Program Buffer 0 (progbuf0)");
+        case 0x21:
+            return std::string("Program Buffer 1 (progbuf1)");
+        case 0x22:
+            return std::string("Program Buffer 2 (progbuf2)");
+        case 0x23:
+            return std::string("Program Buffer 3 (progbuf3)");
+        case 0x24:
+            return std::string("Program Buffer 4 (progbuf4)");
+        case 0x25:
+            return std::string("Program Buffer 5 (progbuf5)");
+        case 0x26:
+            return std::string("Program Buffer 6 (progbuf6)");
+        case 0x27:
+            return std::string("Program Buffer 7 (progbuf7)");
+        case 0x28:
+            return std::string("Program Buffer 8 (progbuf8)");
+        case 0x29:
+            return std::string("Program Buffer 9 (progbuf9)");
+        case 0x2a:
+            return std::string("Program Buffer 10 (progbuf10)");
+        case 0x2b:
+            return std::string("Program Buffer 11 (progbuf11)");
+        case 0x2c:
+            return std::string("Program Buffer 12 (progbuf12)");
+        case 0x2d:
+            return std::string("Program Buffer 13 (progbuf13)");
+        case 0x2e:
+            return std::string("Program Buffer 14 (progbuf14)");
+        case 0x2f:
+            return std::string("Program Buffer 15 (progbuf15)");
+
+        case 0x30:
+            return std::string("Authentication Data (authdata)");
+        // case 0x31:
+        //     return std::string("");
+        case 0x32:
+            return std::string("Debug Module Control and Status 2 (dmcs2)");
+        // case 0x33:
+        //     return std::string("");
+        case 0x34:
+            return std::string("Halt Summary 2 (haltsum2)");
+        case 0x35:
+            return std::string("Halt Summary 3 (haltsum3)");
+        // case 0x36:
+        //     return std::string("");
+        case 0x37:
+            return std::string("System Bus Address 127:96 (sbaddress3)");
+        case 0x38:
+            return std::string("System Bus Access Control and Status (sbcs)");
+        case 0x39:
+            return std::string("System Bus Address 31:0 (sbaddress0)");
+        case 0x3a:
+            return std::string("System Bus Address 63:32 (sbaddress1)");
+        case 0x3b:
+            return std::string("System Bus Address 95:64 (sbaddress2)");
+        case 0x3c:
+            return std::string("System Bus Data 31:0 (sbdata0)");
+        case 0x3d:
+            return std::string("System Bus Data 63:32 (sbdata1)");
+        case 0x3e:
+            return std::string("System Bus Data 95:64 (sbdata2)");
+        case 0x3f:
+            return std::string("System Bus Data 127:96 (sbdata3)");
+
+        case 0x40:
+            return std::string("Halt Summary 0 (haltsum0)");
+
+        case 0x70:
+            return std::string("Custom Feature 0 (custom0)");
+        case 0x71:
+             return std::string("Custom Feature 1 (custom1)");
+        case 0x72:
+            return std::string("Custom Feature 2 (custom2)");
+        case 0x73:
+             return std::string("Custom Feature 3 (custom3)");
+        case 0x74:
+            return std::string("Custom Feature 4 (custom4)");
+        case 0x75:
+            return std::string("Custom Feature 5 (custom5)");
+        case 0x76:
+             return std::string("Custom Feature 6 (custom6)");
+        case 0x77:
+            return std::string("Custom Feature 7 (custom7)");
+        case 0x78:
+            return std::string("Custom Feature 8 (custom8)");
+        case 0x79:
+            return std::string("Custom Feature 9 (custom9)");
+        case 0x7a:
+            return std::string("Custom Feature 10 (custom10)");
+        case 0x7b:
+            return std::string("Custom Feature 11 (custom11)");
+        case 0x7c:
+            return std::string("Custom Feature 12 (custom12)");
+        case 0x7d:
+            return std::string("Custom Feature 13 (custom13)");
+        case 0x7e:
+            return std::string("Custom Feature 14 (custom14)");
+        case 0x7f:
+            return std::string("Custom Feature 15 (custom15)");
 
         default:
             return std::string("UNKNOWN");

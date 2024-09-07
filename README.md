@@ -146,7 +146,7 @@ g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_m
 
 clear & ./a.out
 
-/home/wbi/openocd/bin/openocd -d -f remote_bitbang.cfg -d4 -l log
+/home/wbi/openocd/bin/openocd -f remote_bitbang.cfg -d4 -l log
 ```
 
 # Interpreting the commands that openocd sends
@@ -487,7 +487,7 @@ static int riscv_examine(struct target *target)
             "request": "launch",
             "program": "/home/wbi/openocd/bin/openocd",
             "cwd": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock",
-            "args": ["-d", "-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
+            "args": ["-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
             "stopAtEntry": true,
             "launchCompleteCommand": "exec-run",
             "linux": {
@@ -521,7 +521,7 @@ static int riscv_examine(struct target *target)
             "request": "launch",
             "program": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock/a.out",
             "cwd": "/home/wbi/dev/openocd/riscv_openocd_jtag_mock",
-            //"args": ["-d", "-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
+            //"args": ["-f", "remote_bitbang.cfg", "-d4", "-l", "log"],
             "stopAtEntry": true,
             "launchCompleteCommand": "exec-run",
             "linux": {
@@ -554,4 +554,883 @@ Debug: 274 676 riscv-013.c:537 check_dbgbase_exists(): [riscv.cpu0] Searching fo
 
 ```
 Debug: 338 995 riscv-013.c:1817 reset_dm(): [riscv.cpu0] Initiating DM reset.
+```
+
+
+
+
+```
+Debug: 9366 14598 riscv.c:3684 riscv_openocd_poll(): [riscv.cpu0] Polling all harts.
+```
+
+```
+Debug: 436 9660 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register zero
+Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register ra
+Debug: 471 10856 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register sp
+Debug: 488 11460 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register gp
+Debug: 505 12064 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register tp
+Debug: 522 12668 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t0
+Debug: 539 13272 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t1
+Debug: 556 13876 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t2
+Debug: 573 14480 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register fp
+Debug: 590 15084 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s1
+Debug: 607 15688 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a0
+Debug: 624 16292 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a1
+Debug: 641 16896 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a2
+Debug: 658 17500 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a3
+Debug: 675 18104 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a4
+Debug: 692 18708 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a5
+Debug: 709 19312 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a6
+Debug: 726 19916 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register a7
+Debug: 743 20520 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s2
+Debug: 760 21124 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s3
+Debug: 777 21728 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s4
+Debug: 794 22350 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s5
+...
+Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register s11
+Debug: 913 26560 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t3
+...
+Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register t6
+Debug: 981 28972 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register dpc
+
+
+```
+
+
+
+## GNU Debugger (gdb)
+
+Start gdb:
+```
+gdb
+```
+
+Connect gdb to openocd:
+
+```
+target remote localhost:3333
+target extended-remote localhost:3333
+```
+
+```
+info registers
+```
+
+
+## Telnet into openocd
+
+```
+telnet 127.0.0.1 4444
+telnet localhost 4444
+help
+```
+
+Working:
+
+```
+jtag names
+riscv info
+
+// reading DebugModuleInterface (DMI) registers
+???
+
+// reading/writing DebugModule (DM) registers
+riscv dm_read <reg_address>
+riscv dm_write <reg_address> value
+
+Example: (Read 0x10 == Debug Module Control) (See page 26 for a list of DM register addresses)
+riscv dm_read 0x10
+```
+
+Not working:
+
+```
+reset halt;
+program firmware.elf verify reset;
+
+sleep 0;
+exit;
+
+get_reg 0
+```
+
+```
+adapter
+      adapter command group (command valid any time)
+  adapter assert |deassert [srst|trst [assert|deassert srst|trst]]
+        Controls SRST and TRST lines.
+  adapter deassert |assert [srst|trst [deassert|assert srst|trst]]
+        Controls SRST and TRST lines.
+  adapter driver driver_name
+        Select a debug adapter driver (configuration command)
+  adapter gpio [
+            
+            do|tdi|tms|tck|trst|swdio|swdio_dir|swclk|srst|led[gpio_number]
+            [-chip chip_number] [-active-high|-active-low]
+            [-push-pull|-open-drain|-open-source]
+            e|-pull-up|-pull-down][-init-inactive|-init-active|-init-input]
+            ]
+        gpio adapter command group (configuration command)
+  adapter list
+        List all built-in debug adapter drivers (command valid any time)
+  adapter name
+        Returns the name of the currently selected adapter (driver)
+        (command valid any time)
+  adapter serial serial_string
+        Set the serial number of the adapter (configuration command)
+  adapter speed [khz]
+        With an argument, change to the specified maximum jtag speed.  For
+        JTAG, 0 KHz signifies adaptive clocking. With or without argument,
+        display current setting. (command valid any time)
+  adapter srst
+        srst adapter command group (command valid any time)
+    adapter srst delay [milliseconds]
+          delay after deasserting SRST in ms (command valid any time)
+    adapter srst pulse_width [milliseconds]
+          SRST assertion pulse width in ms (command valid any time)
+  adapter transports transport ...
+        Declare transports the adapter supports. (configuration command)
+  adapter usb
+        usb adapter command group (command valid any time)
+    adapter usb location [<bus>-port[.port]...]
+          display or set the USB bus location of the USB device
+          (configuration command)
+add_help_text command_name helptext_string
+      Add new command help text; Command can be multiple tokens. (command
+      valid any time)
+add_script_search_dir <directory>
+      dir to search for config files and scripts (command valid any time)
+add_usage_text command_name usage_string
+      Add new command usage text; command can be multiple tokens. (command
+      valid any time)
+arm
+      ARM Command Group (command valid any time)
+  arm semihosting ['enable'|'disable']
+        activate support for semihosting operations
+  arm semihosting_basedir [dir]
+        set the base directory for semihosting I/O operations
+  arm semihosting_cmdline arguments
+        command line arguments to be passed to program
+  arm semihosting_fileio ['enable'|'disable']
+        activate support for semihosting fileio operations
+  arm semihosting_read_user_param
+        read parameters in semihosting-user-cmd-0x10X callbacks
+  arm semihosting_redirect (disable | tcp <port> ['debug'|'stdio'|'all'])
+        redirect semihosting IO
+  arm semihosting_resexit ['enable'|'disable']
+        activate support for semihosting resumable exit
+bindto [name]
+      Specify address by name on which to listen for incoming TCP/IP
+      connections (configuration command)
+bp [<address> [<asid>] <length> ['hw'|'hw_ctx']]
+      list or set hardware or software breakpoint
+capture command
+      Capture progress output and return as tcl return value. If the
+      progress output was empty, return tcl return value. (command valid
+      any time)
+command
+      core command group (introspection) (command valid any time)
+  command mode [command_name ...]
+        Returns the command modes allowed by a command: 'any', 'config', or
+        'exec'. If no command is specified, returns the current command
+        mode. Returns 'unknown' if an unknown command is given. Command can
+        be multiple tokens. (command valid any time)
+cti
+      CTI commands (configuration command)
+  cti create name '-chain-position' name [options ...]
+        Creates a new CTI object (command valid any time)
+  cti names
+        Lists all registered CTI objects by name (command valid any time)
+dap
+      DAP commands (configuration command)
+  dap create name '-chain-position' name
+        Creates a new DAP instance (command valid any time)
+  dap info [ap_num | 'root']
+        display ROM table for specified MEM-AP (default MEM-AP of current
+        target) or the ADIv6 root ROM table of current target's DAP
+  dap init
+        Initialize all registered DAP instances (command valid any time)
+  dap names
+        Lists all registered DAP instances by name (command valid any time)
+debug_level number
+      Sets the verbosity level of debugging output. 0 shows errors only; 1
+      adds warnings; 2 (default) adds other info; 3 adds debugging; 4 adds
+      extra verbose debugging. (command valid any time)
+debug_reason
+      displays the debug reason of this target
+drscan tap_name (num_bits value)+ ['-endstate' state_name]
+      Execute Data Register (DR) scan for one TAP.  Other TAPs must be in
+      BYPASS mode.
+dump_image filename address size
+echo [-n] string
+      Logs a message at "user" priority. Option "-n" suppresses trailing
+      newline (command valid any time)
+exit
+      exit telnet session (command valid any time)
+fast_load
+      loads active fast load image to current target - mainly for profiling
+      purposes
+fast_load_image filename [address ['bin'|'ihex'|'elf'|'s19' [min_address
+          [max_length]]]]
+      Load image into server memory for later use by fast_load; primarily
+      for profiling (command valid any time)
+find <file>
+      print full path to file according to OpenOCD search rules (command
+      valid any time)
+flash
+      NOR flash command group (command valid any time)
+  flash bank bank_id driver_name base_address size_bytes chip_width_bytes
+            bus_width_bytes target [driver_options ...]
+        Define a new bank with the given name, using the specified NOR
+        flash driver. (configuration command)
+  flash banks
+        Display table with information about flash banks. (command valid
+        any time)
+  flash init
+        Initialize flash devices. (configuration command)
+  flash list
+        Returns a list of details about the flash banks. (command valid any
+        time)
+flush_count
+      Returns the number of times the JTAG queue has been flushed.
+gdb
+      GDB commands (command valid any time)
+  gdb breakpoint_override ('hard'|'soft'|'disable')
+        Display or specify type of breakpoint to be used by gdb 'break'
+        commands. (command valid any time)
+  gdb flash_program ('enable'|'disable')
+        enable or disable flash program (configuration command)
+  gdb memory_map ('enable'|'disable')
+        enable or disable memory map (configuration command)
+  gdb port [port_num]
+        Normally gdb listens to a TCP/IP port. Each subsequent GDB server
+        listens for the next port number after the base port number
+        specified. No arguments reports GDB port. "pipe" means listen to
+        stdin output to stdout, an integer is base port number, "disabled"
+        disables port. Any other string is are interpreted as named pipe to
+        listen to. Output pipe is the same name as input pipe, but with 'o'
+        appended. (configuration command)
+  gdb report_data_abort ('enable'|'disable')
+        enable or disable reporting data aborts (configuration command)
+  gdb report_register_access_error ('enable'|'disable')
+        enable or disable reporting register access errors (configuration
+        command)
+  gdb save_tdesc
+        Save the target description file
+  gdb sync
+        next stepi will return immediately allowing GDB to fetch register
+        state without affecting target state (command valid any time)
+  gdb target_description ('enable'|'disable')
+        enable or disable target description (configuration command)
+get_reg list
+      Get register values from the target
+halt [milliseconds]
+      request target to halt, then wait up to the specified number of
+      milliseconds (default 5000) for it to complete
+help [command_name]
+      Show full command help; command can be multiple tokens. (command
+      valid any time)
+init
+      Initializes configured targets and servers.  Changes command mode
+      from CONFIG to EXEC.  Unless 'noinit' is called, this command is
+      called automatically at the end of startup. (command valid any time)
+ipdbg
+      IPDBG Hub/Host commands. (command valid any time)
+  ipdbg create-hub name.ipdbghub (-tap device.tap -ir ir_value [dr_length]
+            | -pld name.pld [user]) [-vir [vir_value [length
+            [instr_code]]]]
+        create a IPDBG Hub (command valid any time)
+irscan [tap_name instruction]* ['-endstate' state_name]
+      Execute Instruction Register (IR) scan.  The specified opcodes are
+      put into each TAP's IR, and other TAPs are put in BYPASS.
+jsp_port [port_num]
+      Specify port on which to listen for incoming JSP telnet connections.
+      (command valid any time)
+jtag
+      perform jtag tap actions (command valid any time)
+  jtag arp_init
+        Validates JTAG scan chain against the list of declared TAPs using
+        just the four standard JTAG signals. (command valid any time)
+  jtag arp_init-reset
+        Uses TRST and SRST to try resetting everything on the JTAG scan
+        chain, then performs 'jtag arp_init'. (command valid any time)
+  jtag cget tap_name '-event' event_name | tap_name '-idcode'
+        Return any Tcl handler for the specified TAP event or the value of
+        the IDCODE found in hardware.
+  jtag configure tap_name '-event' event_name handler
+        Provide a Tcl handler for the specified TAP event. (command valid
+        any time)
+  jtag drscan tap_name (num_bits value)+ ['-endstate' state_name]
+        Execute Data Register (DR) scan for one TAP.  Other TAPs must be in
+        BYPASS mode.
+  jtag flush_count
+        Returns the number of times the JTAG queue has been flushed.
+  jtag init
+        initialize jtag scan chain (command valid any time)
+  jtag names
+        Returns list of all JTAG tap names. (command valid any time)
+  jtag newtap basename tap_type '-irlen' count ['-enable'|'-disable']
+            ['-expected_id' number] ['-ignore-version'] ['-ignore-bypass']
+            ['-ircapture' number] ['-ir-bypass' number] ['-mask' number]
+        Create a new TAP instance named basename.tap_type, and appends it
+        to the scan chain. (configuration command)
+  jtag pathmove start_state state1 [state2 [state3 ...]]
+        Move JTAG state machine from current state (start_state) to state1,
+        then state2, state3, etc.
+  jtag tapdisable tap_name
+        Try to disable the specified TAP using the 'tap-disable' TAP event.
+  jtag tapenable tap_name
+        Try to enable the specified TAP using the 'tap-enable' TAP event.
+  jtag tapisenabled tap_name
+        Returns a Tcl boolean (0/1) indicating whether the TAP is enabled
+        (1) or not (0).
+jtag_flush_queue_sleep [sleep in ms]
+      For debug purposes(simulate long delays of interface) to test
+      performance or change in behavior. Default 0ms. (command valid any
+      time)
+jtag_ntrst_assert_width [milliseconds]
+      delay after asserting trst in ms (command valid any time)
+jtag_ntrst_delay [milliseconds]
+      delay after deasserting trst in ms (command valid any time)
+jtag_rclk [fallback_speed_khz]
+      With an argument, change to to use adaptive clocking if possible;
+      else to use the fallback speed.  With or without argument, display
+      current setting. (command valid any time)
+load_image filename [address ['bin'|'ihex'|'elf'|'s19' [min_address
+          [max_length]]]]
+log_output [file_name | 'default']
+      redirect logging to a file (default: stderr) (command valid any time)
+mdb ['phys'] address [count]
+      display memory bytes
+mdd ['phys'] address [count]
+      display memory double-words
+mdh ['phys'] address [count]
+      display memory half-words
+mdw ['phys'] address [count]
+      display memory words
+measure_clk
+      Runs a test to measure the JTAG clk. Useful with RCLK / RTCK.
+      (command valid any time)
+ms
+      Returns ever increasing milliseconds. Used to calculate differences
+      in time. (command valid any time)
+mwb ['phys'] address value [count]
+      write memory byte
+mwd ['phys'] address value [count]
+      write memory double-word
+mwh ['phys'] address value [count]
+      write memory half-word
+mww ['phys'] address value [count]
+      write memory word
+nand
+      NAND flash command group (command valid any time)
+  nand device bank_id driver target [driver_options ...]
+        defines a new NAND bank (configuration command)
+  nand drivers
+        lists available NAND drivers (command valid any time)
+  nand init
+        initialize NAND devices (configuration command)
+noinit
+      Prevent 'init' from being called at startup. (configuration command)
+ocd_find file
+      find full path to file (command valid any time)
+pathmove start_state state1 [state2 [state3 ...]]
+      Move JTAG state machine from current state (start_state) to state1,
+      then state2, state3, etc.
+pld
+      programmable logic device commands (command valid any time)
+  pld create name.pld driver_name [driver_args ... ]
+        create a PLD device (configuration command)
+  pld init
+        initialize PLD devices (configuration command)
+poll ['on'|'off']
+      poll target state; or reconfigure background polling
+poll_period
+      set the servers polling period (command valid any time)
+power_restore
+      Overridable procedure run when power restore is detected. Runs 'reset
+      init' by default. (command valid any time)
+profile seconds filename [start end]
+      profiling samples the CPU PC
+program <filename> [address] [preverify] [verify] [reset] [exit]
+      write an image to flash, address is only required for binary images.
+      preverify, verify, reset, exit are optional (command valid any time)
+ps
+      list all tasks
+rbp 'all' | address
+      remove breakpoint
+read_memory address width count ['phys']
+      Read Tcl list of 8/16/32/64 bit numbers from target memory
+reg [(register_number|register_name) [(value|'force')]]
+      display (reread from target with "force") or set a register; with no
+      arguments, displays all registers and their values
+remote_bitbang
+      perform remote_bitbang management (command valid any time)
+  remote_bitbang host host_name
+        Set the host to use to connect to the remote jtag.
+  if port is 0
+        or unset, this is the name of the unix socket to use.
+        (configuration command)
+  remote_bitbang port port_number
+        Set the port to use to connect to the remote jtag.
+  if 0 or unset,
+        use unix sockets to connect to the remote jtag. (configuration
+        command)
+  remote_bitbang use_remote_sleep (on|off)
+        Rather than executing sleep locally, include delays in the
+        instruction stream for the remote host. (configuration command)
+reset [run|halt|init]
+      Reset all targets into the specified mode. Default reset mode is run,
+      if not given.
+reset_config [none|trst_only|srst_only|trst_and_srst]
+          [srst_pulls_trst|trst_pulls_srst|combined|separate]
+          [srst_gates_jtag|srst_nogate] [trst_push_pull|trst_open_drain]
+          [srst_push_pull|srst_open_drain]
+          [connect_deassert_srst|connect_assert_srst]
+      configure adapter reset behavior (command valid any time)
+reset_nag ['enable'|'disable']
+      Nag after each reset about options that could have been enabled to
+      improve performance. (command valid any time)
+resume [address]
+      resume target execution from current PC or address
+riscv
+      RISC-V Command Group (command valid any time)
+  riscv authdata_read [index]
+        Return the 32-bit value read from authdata or authdata0 (index=0),
+        or authdata1 (index=1). (command valid any time)
+  riscv authdata_write [index] value
+        Write the 32-bit value to authdata or authdata0 (index=0), or
+        authdata1 (index=1). (command valid any time)
+  riscv dm_read reg_address
+        Read and return 32-bit value from a debug module's register at
+        reg_address. (command valid any time)
+  riscv dm_write reg_address value
+        Write a 32-bit value to the debug module's register at reg_address.
+        (command valid any time)
+  riscv dmi_read address
+        Read and return 32-bit value from the given address on the RISC-V
+        DMI bus. (command valid any time)
+  riscv dmi_write address value
+        Write a 32-bit value to the given address on the RISC-V DMI bus.
+        (command valid any time)
+  riscv dump_sample_buf [base64]
+        Print the contents of the sample buffer, and clear the buffer.
+        (command valid any time)
+  riscv etrigger set [vs] [vu] [m] [s] [u] <exception_codes>|clear
+        Set or clear a single exception trigger.
+  riscv exec_progbuf instr1 [instr2 [... instr16]]
+        Execute a sequence of 32-bit instructions using the program buffer.
+        The final ebreak instruction is added automatically, if needed.
+  riscv expose_csrs n0[-m0|=name0][,n1[-m1|=name1]]...
+        Configure a list of inclusive ranges for CSRs to expose in addition
+        to the standard ones. This must be executed before `init`.
+        (configuration command)
+  riscv expose_custom n0[-m0|=name0][,n1[-m1|=name1]]...
+        Configure a list of inclusive ranges for custom registers to
+        expose. custom0 is accessed as abstract register number 0xc000,
+        etc. This must be executed before `init`. (configuration command)
+  riscv hide_csrs {n0|n-m0}[,n1|n-m1]......
+        Configure a list of inclusive ranges for CSRs to hide from gdb.
+        Hidden registers are still available, but are not listed in gdb
+        target description and `reg` command output. This must be executed
+        before `init`. (configuration command)
+  riscv icount set [vs] [vu] [m] [s] [u] [pending] <count>|clear
+        Set or clear a single instruction count trigger.
+  riscv info
+        Displays some information OpenOCD detected about the target.
+        (command valid any time)
+  riscv itrigger set [vs] [vu] [nmi] [m] [s] [u] <mie_bits>|clear
+        Set or clear a single interrupt trigger.
+  riscv memory_sample bucket address|clear [size=4]
+        Causes OpenOCD to frequently read size bytes at the given address.
+        (command valid any time)
+  riscv repeat_read count address [size=4]
+        Repeatedly read the value at address. (command valid any time)
+  riscv reset_delays [wait]
+        OpenOCD learns how many Run-Test/Idle cycles are required between
+        scans to avoid encountering the target being busy. This command
+        resets those learned values after `wait` scans. It's only useful
+        for testing OpenOCD itself. (command valid any time)
+  riscv resume_order normal|reversed
+        Choose the order that harts are resumed in when `hasel` is not
+        supported. Normal order is from lowest hart index to highest.
+        Reversed order is from highest hart index to lowest. (command valid
+        any time)
+  riscv set_bscan_tunnel_ir value
+        Specify the JTAG TAP IR used to access the bscan tunnel. By default
+        it is 0x23 << (ir_length - 6), which map some Xilinx FPGA (IR
+        USER4) (command valid any time)
+  riscv set_command_timeout_sec [sec]
+        Set the wall-clock timeout (in seconds) for individual commands
+        (command valid any time)
+  riscv set_ebreakm [on|off]
+        Control dcsr.ebreakm. When off, M-mode ebreak instructions don't
+        trap to OpenOCD. Defaults to on. (command valid any time)
+  riscv set_ebreaks [on|off]
+        Control dcsr.ebreaks. When off, S-mode ebreak instructions don't
+        trap to OpenOCD. Defaults to on. (command valid any time)
+  riscv set_ebreaku [on|off]
+        Control dcsr.ebreaku. When off, U-mode ebreak instructions don't
+        trap to OpenOCD. Defaults to on. (command valid any time)
+  riscv set_enable_trigger_feature [('eq'|'napot'|'ge_lt'|'all')
+            ('wp'|'none')]
+        Control whether OpenOCD is allowed to use certain RISC-V trigger
+        features for watchpoints. (command valid any time)
+  riscv set_enable_virt2phys on|off
+        When on (default), enable translation from virtual address to
+        physical address. (command valid any time)
+  riscv set_enable_virtual on|off
+        When on, memory accesses are performed on physical or virtual
+        memory depending on the current system configuration. When off
+        (default), all memory accessses are performed on physical memory.
+        (command valid any time)
+  riscv set_ir [idcode|dtmcs|dmi] value
+        Set IR value for specified JTAG register. (command valid any time)
+  riscv set_maskisr ['off'|'steponly']
+        mask riscv interrupts
+  riscv set_mem_access method1 [method2] [method3]
+        Set which memory access methods shall be used and in which order of
+        priority. Method can be one of: 'progbuf', 'sysbus' or 'abstract'.
+        (command valid any time)
+  riscv set_reset_timeout_sec [sec]
+        DEPRECATED. Use 'riscv set_command_timeout_sec' instead. (command
+        valid any time)
+  riscv use_bscan_tunnel value [type]
+        Enable or disable use of a BSCAN tunnel to reach DM.  Supply the
+        width of the DM transport TAP's instruction register to enable. 
+        Supply a value of 0 to disable. Pass A second argument (optional)
+        to indicate Bscan Tunnel Type {0:(default) NESTED_TAP , 1:
+        DATA_REGISTER} (command valid any time)
+riscv.cpu0
+      target command group (command valid any time)
+  riscv.cpu0 arm
+        ARM Command Group (command valid any time)
+    riscv.cpu0 arm semihosting ['enable'|'disable']
+          activate support for semihosting operations
+    riscv.cpu0 arm semihosting_basedir [dir]
+          set the base directory for semihosting I/O operations
+    riscv.cpu0 arm semihosting_cmdline arguments
+          command line arguments to be passed to program
+    riscv.cpu0 arm semihosting_fileio ['enable'|'disable']
+          activate support for semihosting fileio operations
+    riscv.cpu0 arm semihosting_read_user_param
+          read parameters in semihosting-user-cmd-0x10X callbacks
+    riscv.cpu0 arm semihosting_redirect (disable | tcp <port>
+              ['debug'|'stdio'|'all'])
+          redirect semihosting IO
+    riscv.cpu0 arm semihosting_resexit ['enable'|'disable']
+          activate support for semihosting resumable exit
+  riscv.cpu0 arp_examine ['allow-defer']
+        used internally for reset processing
+  riscv.cpu0 arp_halt
+        used internally for reset processing
+  riscv.cpu0 arp_halt_gdb
+        used internally for reset processing to halt GDB
+  riscv.cpu0 arp_poll
+        used internally for reset processing
+  riscv.cpu0 arp_reset 'assert'|'deassert' halt
+        used internally for reset processing
+  riscv.cpu0 arp_waitstate statename timeoutmsecs
+        used internally for reset processing
+  riscv.cpu0 cget target_attribute
+        returns the specified target attribute (command valid any time)
+  riscv.cpu0 configure [target_attribute ...]
+        configure a new target for use (command valid any time)
+  riscv.cpu0 curstate
+        displays the current state of this target
+  riscv.cpu0 debug_reason
+        displays the debug reason of this target
+  riscv.cpu0 eventlist
+        displays a table of events defined for this target
+  riscv.cpu0 examine_deferred
+        used internally for reset processing
+  riscv.cpu0 get_reg list
+        Get register values from the target
+  riscv.cpu0 invoke-event event_name
+        invoke handler for specified event
+  riscv.cpu0 mdb address [count]
+        Display target memory as 8-bit bytes
+  riscv.cpu0 mdd address [count]
+        Display target memory as 64-bit words
+  riscv.cpu0 mdh address [count]
+        Display target memory as 16-bit half-words
+  riscv.cpu0 mdw address [count]
+        Display target memory as 32-bit words
+  riscv.cpu0 mwb address data [count]
+        Write byte(s) to target memory
+  riscv.cpu0 mwd address data [count]
+        Write 64-bit word(s) to target memory
+  riscv.cpu0 mwh address data [count]
+        Write 16-bit half-word(s) to target memory
+  riscv.cpu0 mww address data [count]
+        Write 32-bit word(s) to target memory
+  riscv.cpu0 read_memory address width count ['phys']
+        Read Tcl list of 8/16/32/64 bit numbers from target memory
+  riscv.cpu0 riscv
+        RISC-V Command Group (command valid any time)
+    riscv.cpu0 riscv authdata_read [index]
+          Return the 32-bit value read from authdata or authdata0
+          (index=0), or authdata1 (index=1). (command valid any time)
+    riscv.cpu0 riscv authdata_write [index] value
+          Write the 32-bit value to authdata or authdata0 (index=0), or
+          authdata1 (index=1). (command valid any time)
+    riscv.cpu0 riscv dm_read reg_address
+          Read and return 32-bit value from a debug module's register at
+          reg_address. (command valid any time)
+    riscv.cpu0 riscv dm_write reg_address value
+          Write a 32-bit value to the debug module's register at
+          reg_address. (command valid any time)
+    riscv.cpu0 riscv dmi_read address
+          Read and return 32-bit value from the given address on the RISC-V
+          DMI bus. (command valid any time)
+    riscv.cpu0 riscv dmi_write address value
+          Write a 32-bit value to the given address on the RISC-V DMI bus.
+          (command valid any time)
+    riscv.cpu0 riscv dump_sample_buf [base64]
+          Print the contents of the sample buffer, and clear the buffer.
+          (command valid any time)
+    riscv.cpu0 riscv etrigger set [vs] [vu] [m] [s] [u]
+              <exception_codes>|clear
+          Set or clear a single exception trigger.
+    riscv.cpu0 riscv exec_progbuf instr1 [instr2 [... instr16]]
+          Execute a sequence of 32-bit instructions using the program
+          buffer. The final ebreak instruction is added automatically, if
+          needed.
+    riscv.cpu0 riscv expose_csrs n0[-m0|=name0][,n1[-m1|=name1]]...
+          Configure a list of inclusive ranges for CSRs to expose in
+          addition to the standard ones. This must be executed before
+          `init`. (configuration command)
+    riscv.cpu0 riscv expose_custom n0[-m0|=name0][,n1[-m1|=name1]]...
+          Configure a list of inclusive ranges for custom registers to
+          expose. custom0 is accessed as abstract register number 0xc000,
+          etc. This must be executed before `init`. (configuration command)
+    riscv.cpu0 riscv hide_csrs {n0|n-m0}[,n1|n-m1]......
+          Configure a list of inclusive ranges for CSRs to hide from gdb.
+          Hidden registers are still available, but are not listed in gdb
+          target description and `reg` command output. This must be
+          executed before `init`. (configuration command)
+    riscv.cpu0 riscv icount set [vs] [vu] [m] [s] [u] [pending]
+              <count>|clear
+          Set or clear a single instruction count trigger.
+    riscv.cpu0 riscv info
+          Displays some information OpenOCD detected about the target.
+          (command valid any time)
+    riscv.cpu0 riscv itrigger set [vs] [vu] [nmi] [m] [s] [u]
+              <mie_bits>|clear
+          Set or clear a single interrupt trigger.
+    riscv.cpu0 riscv memory_sample bucket address|clear [size=4]
+          Causes OpenOCD to frequently read size bytes at the given
+          address. (command valid any time)
+    riscv.cpu0 riscv repeat_read count address [size=4]
+          Repeatedly read the value at address. (command valid any time)
+    riscv.cpu0 riscv reset_delays [wait]
+          OpenOCD learns how many Run-Test/Idle cycles are required between
+          scans to avoid encountering the target being busy. This command
+          resets those learned values after `wait` scans. It's only useful
+          for testing OpenOCD itself. (command valid any time)
+    riscv.cpu0 riscv resume_order normal|reversed
+          Choose the order that harts are resumed in when `hasel` is not
+          supported. Normal order is from lowest hart index to highest.
+          Reversed order is from highest hart index to lowest. (command
+          valid any time)
+    riscv.cpu0 riscv set_bscan_tunnel_ir value
+          Specify the JTAG TAP IR used to access the bscan tunnel. By
+          default it is 0x23 << (ir_length - 6), which map some Xilinx FPGA
+          (IR USER4) (command valid any time)
+    riscv.cpu0 riscv set_command_timeout_sec [sec]
+          Set the wall-clock timeout (in seconds) for individual commands
+          (command valid any time)
+    riscv.cpu0 riscv set_ebreakm [on|off]
+          Control dcsr.ebreakm. When off, M-mode ebreak instructions don't
+          trap to OpenOCD. Defaults to on. (command valid any time)
+    riscv.cpu0 riscv set_ebreaks [on|off]
+          Control dcsr.ebreaks. When off, S-mode ebreak instructions don't
+          trap to OpenOCD. Defaults to on. (command valid any time)
+    riscv.cpu0 riscv set_ebreaku [on|off]
+          Control dcsr.ebreaku. When off, U-mode ebreak instructions don't
+          trap to OpenOCD. Defaults to on. (command valid any time)
+    riscv.cpu0 riscv set_enable_trigger_feature
+              [('eq'|'napot'|'ge_lt'|'all') ('wp'|'none')]
+          Control whether OpenOCD is allowed to use certain RISC-V trigger
+          features for watchpoints. (command valid any time)
+    riscv.cpu0 riscv set_enable_virt2phys on|off
+          When on (default), enable translation from virtual address to
+          physical address. (command valid any time)
+    riscv.cpu0 riscv set_enable_virtual on|off
+          When on, memory accesses are performed on physical or virtual
+          memory depending on the current system configuration. When off
+          (default), all memory accessses are performed on physical memory.
+          (command valid any time)
+    riscv.cpu0 riscv set_ir [idcode|dtmcs|dmi] value
+          Set IR value for specified JTAG register. (command valid any
+          time)
+    riscv.cpu0 riscv set_maskisr ['off'|'steponly']
+          mask riscv interrupts
+    riscv.cpu0 riscv set_mem_access method1 [method2] [method3]
+          Set which memory access methods shall be used and in which order
+          of priority. Method can be one of: 'progbuf', 'sysbus' or
+          'abstract'. (command valid any time)
+    riscv.cpu0 riscv set_reset_timeout_sec [sec]
+          DEPRECATED. Use 'riscv set_command_timeout_sec' instead. (command
+          valid any time)
+    riscv.cpu0 riscv use_bscan_tunnel value [type]
+          Enable or disable use of a BSCAN tunnel to reach DM.  Supply the
+          width of the DM transport TAP's instruction register to enable. 
+          Supply a value of 0 to disable. Pass A second argument (optional)
+          to indicate Bscan Tunnel Type {0:(default) NESTED_TAP , 1:
+          DATA_REGISTER} (command valid any time)
+  riscv.cpu0 set_reg dict
+        Set target register values
+  riscv.cpu0 smp [on|off]
+        smp handling
+  riscv.cpu0 smp_gdb
+        display/fix current core played to gdb
+  riscv.cpu0 was_examined
+        used internally for reset processing
+  riscv.cpu0 write_memory address width data ['phys']
+        Write Tcl list of 8/16/32/64 bit numbers to target memory
+rtt
+      RTT (command valid any time)
+  rtt server
+        RTT server (command valid any time)
+    rtt server start <port> <channel> [message]
+          Start a RTT server (command valid any time)
+    rtt server stop <port>
+          Stop a RTT server (command valid any time)
+runtest num_cycles
+      Move to Run-Test/Idle, and issue TCK for num_cycles.
+rwp 'all' | address
+      remove watchpoint
+scan_chain
+      print current scan chain configuration (command valid any time)
+script <file>
+      filename of OpenOCD script (tcl) to run (command valid any time)
+set_reg dict
+      Set target register values
+shutdown
+      shut the server down (command valid any time)
+sleep milliseconds ['busy']
+      Sleep for specified number of milliseconds.  "busy" will busy wait
+      instead (avoid this). (command valid any time)
+smp [on|off]
+      smp handling
+smp_gdb
+      display/fix current core played to gdb
+soft_reset_halt
+      halt the target and do a soft reset
+srst_deasserted
+      Overridable procedure run when srst deassert is detected. Runs 'reset
+      init' by default. (command valid any time)
+step [address]
+      step one instruction from current PC or address
+svf [-tap device.tap] [-quiet] [-nil] [-progress] [-ignore_error]
+          [-noreset] [-addcycles numcycles] file
+      Runs a SVF file.
+swo
+      swo command group
+  swo create name [-dap dap] [-ap-num num] [-baseaddr baseaddr]
+        Creates a new TPIU or SWO object (command valid any time)
+  swo init
+        Initialize TPIU and SWO
+  swo names
+        Lists all registered TPIU and SWO objects by name (command valid
+        any time)
+target
+      configure target (configuration command)
+  target create name type '-chain-position' name [options ...]
+        Creates and selects a new target (configuration command)
+  target current
+        Returns the currently selected target (command valid any time)
+  target init
+        initialize targets (configuration command)
+  target names
+        Returns the names of all targets as a list of strings (command
+        valid any time)
+  target smp targetname1 targetname2 ...
+        gather several target in a smp list (command valid any time)
+  target types
+        Returns the available target types as a list of strings (command
+        valid any time)
+target_request
+      target request command group (command valid any time)
+  target_request debugmsgs ['enable'|'charmsg'|'disable']
+        display and/or modify reception of debug messages from target
+targets [target]
+      change current default target (one parameter) or prints table of all
+      targets (no parameters) (command valid any time)
+tcl
+      tcl command group (command valid any time)
+  tcl notifications [on|off]
+        Target Notification output
+  tcl port [port_num]
+        Specify port on which to listen for incoming Tcl syntax.  Read help
+        on 'gdb port'. (configuration command)
+  tcl trace [on|off]
+        Target trace output
+telnet_port [port_num]
+      Specify port on which to listen for incoming telnet connections. 
+      Read help on 'gdb port'. (configuration command)
+test_image filename [offset [type]]
+test_mem_access size
+      Test the target's memory access functions
+tms_sequence ['short'|'long']
+      Display or change what style TMS sequences to use for JTAG state
+      transitions:  short (default) or long.  Only for working around JTAG
+      bugs. (command valid any time)
+tpiu
+      tpiu command group
+  tpiu create name [-dap dap] [-ap-num num] [-baseaddr baseaddr]
+        Creates a new TPIU or SWO object (command valid any time)
+  tpiu init
+        Initialize TPIU and SWO
+  tpiu names
+        Lists all registered TPIU and SWO objects by name (command valid
+        any time)
+trace
+      trace command group
+  trace history ['clear'|size]
+        display trace history, clear history or set size
+  trace point ['clear'|address]
+        display trace points, clear list of trace points, or add new
+        tracepoint at address
+transport
+      Transport command group (command valid any time)
+  transport init
+        Initialize this session's transport (command valid any time)
+  transport list
+        list all built-in transports (command valid any time)
+  transport select [transport_name]
+        Select this session's transport (command valid any time)
+usage [command_name]
+      Show basic command usage; command can be multiple tokens. (command
+      valid any time)
+verify_image filename [offset [type]]
+verify_image_checksum filename [offset [type]]
+verify_ircapture ['enable'|'disable']
+      Display or assign flag controlling whether to verify values captured
+      during Capture-IR. (command valid any time)
+verify_jtag ['enable'|'disable']
+      Display or assign flag controlling whether to verify values captured
+      during IR and DR scans. (command valid any time)
+version [git]
+      show program version (command valid any time)
+virt2phys virtual_address
+      translate a virtual address into a physical address (command valid
+      any time)
+wait_halt [milliseconds]
+      wait up to the specified number of milliseconds (default 5000) for a
+      previously requested halt
+wait_srst_deassert ms
+      Wait for an SRST deassert. Useful for cases where you need something
+      to happen within ms of an srst deassert. Timeout in ms (command valid
+      any time)
+wp [address length [('r'|'w'|'a') [value [mask]]]]
+      list (no params) or create watchpoints
+write_memory address width data ['phys']
+      Write Tcl list of 8/16/32/64 bit numbers to target memory
+xsvf (tapname|'plain') filename ['virt2'] ['quiet']
+      Runs a XSVF file.  If 'virt2' is given, xruntest counts are
+      interpreted as TCK cycles rather than as microseconds.  Without the
+      'quiet' option, all comments, retries, and mismatches will be
+      reported.
 ```

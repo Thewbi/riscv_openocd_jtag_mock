@@ -130,15 +130,22 @@ private:
     // uint32_t id_code_container_register = 0x05B4603F; // https://onlinedocs.microchip.com/oxy/GUID-C0DEC68F-9589-43E1-B26B-4C3E38933283-en-US-1/GUID-A95CFBC2-41D5-4755-AB8E-B4866693D026.html
     // uint32_t id_code_container_register = 0x20000c05; // https://community.platformio.org/t/openocd-flash-command-for-risc-v/26038/3
     uint32_t id_code_container_register = 0x20000913;
-    uint32_t id_code_shift_register; // this is the IDCODE shift register
+    uint32_t id_code_shift_register{0}; // this is the IDCODE shift register
 
     // 6.1.4. DTM Control and Status (dtmcs, at 0x10)
-    uint32_t dtmcs_container_register;
-    uint32_t dtmcs_shift_register;
+    uint32_t dtmcs_container_register{0};
+    uint32_t dtmcs_shift_register{0};
 
     // 6.1.5. Debug Module Interface Access (dmi, at 0x11)
-    uint64_t dmi_container_register;
-    uint64_t dmi_shift_register;
+    //
+    // Via read and write operations to this register while specifying addresses
+    // of registers inside the DM, the DM register can be read and written via
+    // the DTM
+    uint64_t dmi_container_register{0};
+    uint64_t dmi_shift_register{0};
+
+    //uint32_t status_container_register{0};
+    //uint32_t status_shift_register{0};
 
     uint8_t shift_amount{0};
 
@@ -180,7 +187,7 @@ private:
     /// @return a human readable name for the operation.
     std::string operation_as_string(uint64_t dmi_op);
 
-
+    std::string dm_register_as_string(uint32_t address);
 
 
     uint32_t haltreq = 0x00; // writing 0 clears the halt request for all currently selected harts. This may cancal outstanding halt requests for those harts.
