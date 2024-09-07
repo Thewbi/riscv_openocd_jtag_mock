@@ -143,7 +143,9 @@ server on localhost:3335 since this server does not exist yet!
 
 ```
 g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_machine_callback.cpp -g
-./a.out
+
+clear & ./a.out
+
 /home/wbi/openocd/bin/openocd -d -f remote_bitbang.cfg -d4 -l log
 ```
 

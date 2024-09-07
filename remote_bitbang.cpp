@@ -188,31 +188,39 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
                 switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
                 {
 
+                // DebugSpec, Page 93 - IDCODE register - To identify a specific silicon version.
                 case RiscV_DTM_Registers::JTAG_IDCODE:
 
                     //fprintf(stderr, "SHIFT_DR entered. rising_edge_clk: %d. SHIFT ", rising_edge_clk);
 
-                    // prepare send (which happens on the falling edge of the clock)
-                    // preload the pin with the value that is shifted out from the shift register
-                    tdo = id_code_shift_register & 0x01;
+                    // ignore first shift (dtmcontrol_scan_via_bscan() inside openocd source code: 
+                    // "Note the starting offset is bit 1, not bit 0. In BSCAN tunnel, there is a one-bit TCK skew between output and input")
+                    if (shift_amount >= 1) {
 
-                    // shift data from the tdi register in
-                    id_code_shift_register = id_code_shift_register >> 1;
+                        // prepare send (which happens on the falling edge of the clock)
+                        // preload the pin with the value that is shifted out from the shift register
+                        tdo = id_code_shift_register & 0x01;
 
-                    // shift in tdi from the left
-                    id_code_shift_register |= (tdi << (32 - 1)); // size of idcode container register is 32 bits
+                        // shift data from the tdi register in
+                        id_code_shift_register = id_code_shift_register >> 1;
 
+                        // shift in tdi from the left
+                        id_code_shift_register |= (tdi << (32 - 1)); // size of idcode container register is 32 bits
+
+                    }
+                    shift_amount++;
                     break;
 
                 // case Instruction::BYPASS:
                 //     fprintf(stderr, "[Error] Unknown instruction register!!! BYPASS\n");
                 //     break;
 
+                // DebugSpec, Page 
                 case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
                     // fprintf(stderr, "SHIFTING dtcms\n");
 
                     // ignore first shift (dtmcontrol_scan_via_bscan()Note the starting offset is bit 1, not bit 0.  In BSCAN tunnel, there is a one-bit TCK skew between output and input)
-                    if (!first_shift) {
+                    if (shift_amount >= 1) {
 
                         // preload bit to send
                         tdo = dtmcs_shift_register & 0x01;
@@ -223,14 +231,19 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
                         // shift in tdi from the left
                         dtmcs_shift_register |= (tdi << (32 - 1)); // size of dtmcs container register is 32 bits
                     }
-                    first_shift = 0;
+                    shift_amount++;
                     break;
 
                 case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
-                    fprintf(stderr, "SHIFTING dmi. tdi: %ld\n", tdi);
+                    //fprintf(stderr, "SHIFTING dmi. tdi: %ld\n", tdi);
 
                     // ignore first shift (dtmcontrol_scan_via_bscan() Note the starting offset is bit 1, not bit 0.  In BSCAN tunnel, there is a one-bit TCK skew between output and input)
-                    //if (first_shift >= 2) {
+                    tdo = 0;
+                    if (shift_amount >= 1) {
+
+                        // // DEBUG
+                        // fprintf(stderr, "DMI Shift Register: ");
+                        // print_dmi(dmi_shift_register);
 
                         // preload bit to send
                         tdo = dmi_shift_register & 0x01;
@@ -240,15 +253,8 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
 
                         // shift in tdi from the left
                         dmi_shift_register |= (tdi << (ABITS_LENGTH + (34 - 1))); // size of dmi container register is variable bits
-                    //}
-                    //first_shift = 0;
-
-                    if (first_shift == 41) {
-                        fprintf(stderr, "SHIFTING dmi. tdi: %ld\n", tdi);
                     }
-
-
-                    first_shift++;
+                    shift_amount++;
                     break;
 
                 default:
@@ -277,6 +283,443 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi)
 
             break;
         }
+    }
+}
+
+void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_clk)
+{
+    // fprintf(stderr, "state_entered\n");
+
+    uint64_t dmi_address = 0x00;
+    uint64_t dmi_data = 0x00;
+    uint64_t dmi_op = 0x00;
+
+    switch (new_state)
+    {
+
+    // In this state all test-modes (for example extest-mode) are reset, which will disable their operation, allowing the chip to follow its normal operation.
+    case TEST_LOGIC_RESET:
+        // fprintf(stderr, "TEST_LOGIC_RESET entered\n");
+
+        // TODO: write IDCODE value into DR!
+        // see: https://openocd.org/doc/pdf/openocd.pdf#page=69&zoom=100,120,96
+        instruction_container_register = static_cast<uint8_t>(RiscV_DTM_Registers::JTAG_IDCODE);
+
+        break;
+
+    // This is the resting state during normal operation.
+    case RUN_TEST_IDLE:
+        // fprintf(stderr, "RUN_TEST_IDLE entered\n");
+        break;
+
+    // These are the starting states respectively for accessing one of the data registers
+    // (the boundary-scan or bypass register in the minimal configuration) or the instruction register.
+    case SELECT_DR_SCAN:
+        // fprintf(stderr, "SELECT_DR_SCAN entered\n");
+
+        // TODO: select the data register.
+        //
+        // The data register is a symbol register which means it points to another register.
+        //
+        // The real register that DR points to is specified via the IR register contents.
+        // Real registers are indexed vai the current value of IR. Therefore first load some
+        // value into IR then perform SELECT_DR_SCAN
+        //
+        // Remember: during TAP reset, IR is preloaded with the index of the IDCODE register!
+        // (Or also possible the bypass register). This means that after TAP reset, when activating
+        // The SELECT_DR_SCAN, the DR will point to the IDCODE register!
+        //
+        // Lets assume this simulated TAP enters IDCODE into IR on reset. This means during
+        // SELECT_DR_SCAN, the IDCODE register is selected.
+        //
+        // The result of all this selecting real registers is that whenever
+        break;
+    case SELECT_IR_SCAN:
+        // fprintf(stderr, "SELECT_IR_SCAN entered\n");
+        break;
+
+    // These capture the current value of one of the data registers or the instruction register respectively
+    // into the scan cells (= Shift register). This is a slight misnomer for the instruction register, since it is usual
+    // to capture status information, rather than the actual instruction with Capture-IR.
+    case CAPTURE_DR:
+        // fprintf(stderr, "CAPTURE_DR entered\n");
+
+        // TODO: copy the current value stored inside the selected [data container register] into the corresponding
+        // [data shift register].
+        //
+        // Real data registers always come in pairs. The pairs consist of a [data container register] and a
+        // [data shift register].
+        //
+        // There is a real [data container register] that stores the current value.
+        // Then there is the other element to the pair which is the [data shift register]
+        //
+        // The DR symbolic register points to the pair. When the DR symbolic register points
+        // onto a pair, the shift register of that pair is installed right in between the
+        // tdi and tdo ports. This means that the shift register will interact with the openocd
+        // JTAG client.
+        //
+        // The IR register pair is special. There is no symbolic pointer register that points to IR.
+        // All IR  state machines states implicitly operate on the IR register!
+        //
+        // This [data shift register] is the register that will get bit shifted in from
+        // tdi on the rising edge of the clock when in SHIFT_DR or SHIFT_IR state.
+        // The tdo value is taken on the falling edge of the clock from the shift register.
+        //
+        // There are operations to load a value from the [data container register] into the [data shift register].
+        // This operation is performed in the states CAPTURE_DR for the symbolic DR register and CAPTURE_IR respectively
+        // for the IR register.
+        //
+        // There is an operation to store the current value inside the data shift register back into the data container
+        // register. This operation is performed in the state UPDATE_DR and in the state UPDATE_IR for the IR register pair.
+        //
+        // The overall idea is that the data container register remains as is during shift operations because the
+        // shift operations only affect the data shift register. Once the client is happy with the data that they
+        // have shifted into the system, the client can decide to commit that data to the data container register
+        // by transitioning into the UPDATE_DR, UPDATE_IR states.
+        //
+        // In order to read from a register, the client has to first transition into the CAPTURE_DR or CAPTURE_IR
+        // states so that the data is copied from the data container registers into the shift registers, because the
+        // data that a client will receive from the system will always come from the data shift register and
+        // never directly from the data container register.
+
+        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
+        {
+
+        case RiscV_DTM_Registers::JTAG_IDCODE:
+            fprintf(stderr, "CAPTURE_DR - capturing IDCODE into id_code_shift_register\n");
+            id_code_shift_register = id_code_container_register;
+            shift_amount = 0;
+            break;
+
+            // TODO case for bypass
+
+        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
+            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DTM_CONTROL_AND_STATUS - capturing dtmcs_container_register into dtmcs_shift_register - ");
+            print_dtmcs(dtmcs_container_register);
+            dtmcs_shift_register = dtmcs_container_register;
+            shift_amount = 0;
+            break;
+
+        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
+            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DEBUG_MODULE_INTERFACE_ACCESS - capturing dmi_container_register into dmi_shift_register - ");
+            print_dmi(dmi_container_register);
+            dmi_shift_register = dmi_container_register;
+            shift_amount = 0;
+            break;
+
+        default:
+            fprintf(stderr, "[Error] B Unknown instruction register!!!\n");
+            break;
+        }
+
+        break;
+    case CAPTURE_IR:
+        // fprintf(stderr, "CAPTURE_IR entered\n");
+
+        // copy data from the IR container register into the IR shift register.
+        // the length of the IR register can be specified via the openocd.cfg file.
+        // It is set to 8 in this example.
+        instruction_shift_register = static_cast<uint8_t>(instruction_container_register);
+        break;
+
+    // Shift a bit in from TDI (on the rising edge of TCK) and out onto TDO
+    // (on the falling edge of TCK) from the currently selected data or instruction register respectively.
+    case SHIFT_DR:
+        // fprintf(stderr, "SHIFT_DR entered.\n");
+        // the actual shifting is performed on the falling edge
+        break;
+
+    // Shift in a bit from tdi into IR (on the rising edge) and also out from the IR to tdi (on the falling edge)
+    case SHIFT_IR:
+        // fprintf(stderr, "SHIFT_IR entered. rising_edge_clk: %d. \n", rising_edge_clk);
+        // the actual shifting is performed on the falling edge
+        break;
+
+    // These are the exit states for the corresponding shift state.
+    // From here the state machine can either enter a pause state or enter the update state.
+    case EXIT1_DR:
+        // fprintf(stderr, "EXIT1_DR entered\n");
+        break;
+    case EXIT1_IR:
+        // fprintf(stderr, "EXIT1_IR entered\n");
+        break;
+
+    // Pause in shifting data into the data or instruction register.
+    // This allows for example test equipment supplying TDO to reload buffers etc.
+    case PAUSE_DR:
+        // fprintf(stderr, "PAUSE_DR entered\n");
+        break;
+    case PAUSE_IR:
+        // fprintf(stderr, "PAUSE_IR entered\n");
+        break;
+
+    // These are the exit states for the corresponding pause state.
+    // From here the state machine can either resume shifting or enter the update state.
+    case EXIT2_DR:
+        // fprintf(stderr, "EXIT2_DR entered\n");
+        break;
+    case EXIT2_IR:
+        // fprintf(stderr, "EXIT2_IR entered\n");
+        break;
+
+    // The value shifted into the scan cells during the previous states is driven into the chip (from inputs) 
+    // or onto the interconnect (for outputs).
+    case UPDATE_DR:
+        // fprintf(stderr, "UPDATE_DR entered\n");
+        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
+        {
+
+        case RiscV_DTM_Registers::JTAG_IDCODE:
+            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::JTAG_IDCODE\n");
+            id_code_container_register = id_code_shift_register;
+            break;
+
+        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
+            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS\n");
+
+            // print before the change
+            print_dtmcs(dtmcs_container_register);
+
+            // DEBUG just activate this line again!
+            //dtmcs_container_register = dtmcs_shift_register;
+
+            // print after the change
+            print_dtmcs(dtmcs_container_register);
+            break;
+
+        // Debug Specification, page 95, 6.1.5 Debug Module Interface Access (Register)
+        // Allows access to the Debug Module Interface (DMI) which terminates the debug (JTAG) connection
+        // and is connected to one or more Debug Modules (DM).
+        // 
+        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
+
+            fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS\n");
+
+            // DEBUG print before the change
+            print_dmi(dmi_container_register);
+
+            // TODO I think this makes no sense
+            if (dmi_shift_register != 0x00) {
+                dmi_container_register = dmi_shift_register;
+                // print after the change
+                print_dmi(dmi_container_register);
+            }
+
+            dmi_address = get_dmi_address(dmi_container_register);
+            dmi_data = get_dmi_data(dmi_container_register);
+            dmi_op = get_dmi_op(dmi_container_register);
+
+            fprintf(stderr, "dmi_address: %ld, dmi_data: %ld, dmi_op: %ld (%s)\n", dmi_address, dmi_data, dmi_op, operation_as_string(dmi_op).c_str());
+
+            // The user accesses the registers inside the DebugModule over the DebugBus which might be
+            // AXI, AMBA, .... First the command to execute a read operation is sent to the DebugModuleInterface (DMI)
+            // which then talks to the DebugModule (DM) over the bus to access a register.
+
+            // 0x10 == DebugModule Control Register (DebugSpec, Page 26 and Page 30)
+            if (dmi_address == 0x10) {
+                
+                // read operation
+                if ((dmi_address == 0x10) && (dmi_op == 0x01)) {
+
+                    // construct the response
+                    uint64_t debug_module_control = 
+                        (haltreq << 31) |
+                        (resumereq << 30) |
+                        (hartreset << 29) |
+                        (ackhavereset << 28) |
+                        (ackunavail << 27) |
+                        (hasel << 26) |
+                        (hartsello << 16) |
+                        (hartselhi << 6) |
+                        (setkeepalive << 5) |
+                        (clrkeepalive << 4) |
+                        (setresethaltreq << 3) |
+                        (clrresethaltreq << 2) |
+                        (ndmreset << 1) |
+                        (dmactive << 0);
+
+                        // success, the operation 0x00 used in a response is interpreted by openocd
+                        // as a successfull termination of the requested operation
+                        dmi_op = 0x00;
+
+                        // set a value into the dmi_container_register
+                        dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                            ((debug_module_control & 0xFFFFFFFF) << 2) | 
+                            ((dmi_op & 0b11) << 0);
+
+                        // DEBUG
+                        fprintf(stderr, "Outgoing dmi_control_register after READ: ");
+                        print_dmi(dmi_container_register);
+
+                }  
+                // write operation
+                else if ((dmi_address == 0x10) && (dmi_op == 0x02)) {
+                    
+                    // parse the incoming fields
+                    haltreq = ((dmi_data >> 31) & 0b1);
+                    resumereq = ((dmi_data >> 30) & 0b1);
+                    hartreset = ((dmi_data >> 29) & 0b1);
+                    ackhavereset = ((dmi_data >> 28) & 0b1);
+                    ackunavail = ((dmi_data >> 27) & 0b1);
+                    hasel = ((dmi_data >> 26) & 0b1);
+                    hartsello = ((dmi_data >> 16) & 0b1111111111);
+                    hartselhi = ((dmi_data >> 6) & 0b1111111111);
+                    setkeepalive = ((dmi_data >> 5) & 0b1);
+                    clrkeepalive = ((dmi_data >> 4) & 0b1);
+                    setresethaltreq = ((dmi_data >> 3) & 0b1);
+                    clrresethaltreq = ((dmi_data >> 2) & 0b1);
+                    ndmreset = ((dmi_data >> 1) & 0b1);
+                    dmactive = ((dmi_data >> 0) & 0b1);
+
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "haltreq: %d\n", haltreq);
+                    fprintf(stderr, "resumereq: %d\n", resumereq);
+                    fprintf(stderr, "hartreset: %d\n", hartreset);
+                    fprintf(stderr, "ackhavereset: %d\n", ackhavereset);
+                    fprintf(stderr, "ackunavail: %d\n", ackunavail);
+                    fprintf(stderr, "hasel: %d\n", hasel);
+                    fprintf(stderr, "hartsello: %d\n", hartsello);
+                    fprintf(stderr, "hartselhi: %d\n", hartselhi);
+                    fprintf(stderr, "setkeepalive: %d\n", setkeepalive);
+                    fprintf(stderr, "clrkeepalive: %d\n", clrkeepalive);
+                    fprintf(stderr, "setresethaltreq: %d\n", setresethaltreq);
+                    fprintf(stderr, "clrresethaltreq: %d\n", clrresethaltreq);
+                    fprintf(stderr, "ndmreset: %d\n", ndmreset);
+                    fprintf(stderr, "dmactive: %d\n", dmactive);
+
+                    // dm restart requested by writing a 1 into the dmactive bit of the dmcontrol register
+                    if (hasel == 0 && dmactive == 1) {
+
+                        fprintf(stderr, "\nDM restart requested!\n");
+
+                        // simulated restart - seen openocd source code. riscv-013.c, line 1839, "Activating the DM."
+                        // openocd writes a 1 into the DM's dmactive bit to tell the DM to activate.
+                        // openocd then performs a wait loop in which the bit is read. When the dmactive bit is
+                        // eventually read a 1, then openocd continues with the next step.
+                        //
+                        // The next step is to select a hart.
+                        dmactive = 1;
+
+                        // construct the response
+                        uint64_t debug_module_control = 
+                            (haltreq << 31) |
+                            (resumereq << 30) |
+                            (hartreset << 29) |
+                            (ackhavereset << 28) |
+                            (ackunavail << 27) |
+                            (hasel << 26) |
+                            (hartsello << 16) |
+                            (hartselhi << 6) |
+                            (setkeepalive << 5) |
+                            (clrkeepalive << 4) |
+                            (setresethaltreq << 3) |
+                            (clrresethaltreq << 2) |
+                            (ndmreset << 1) |
+                            (dmactive << 0);
+
+                        // success, the operation 0x00 used in a response is interpreted by openocd
+                        // as a successfull termination of the requested operation
+                        dmi_op = 0x00;
+
+                        // set a value into the dmi_container_register
+                        dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                            ((debug_module_control & 0xFFFFFFFF) << 2) | 
+                            ((dmi_op & 0b11) << 0);
+
+                        // DEBUG
+                        fprintf(stderr, "Outgoing dmi_control_register after WRITE: ");
+                        print_dmi(dmi_container_register);
+                    }
+                    else if (hasel == 1) {
+
+                        fprintf(stderr, "\nDM Hart Selection requested!\n");
+
+                        // 0b111111111111111111111000001
+                        //
+                        // 1 - hasel
+                        // 1111111111 - hartsello
+                        // 1111111111 - hartselhi
+                        // 0
+                        // 0
+                        // 0
+                        // 0
+                        // 0
+                        // 1 - dmactive
+
+                        // openocd does not know how many harts exist inside the DM.
+                        // It will therefore perform a probe operation as outlined in the
+                        // RISCV debug specification: page 30, 3.14.2 Debug Module Control (cmcontrol, 0x10)
+                        // "A debugger should discover HARTSELLEN" by writing all ones to hartsel (assuming
+                        // the maximum size) and reading back the value to see which bits were actually set"
+                        //
+                        // hartsel is a name for the combined high and low registers {hartsello, hartselhi}
+                        //
+                        // Every individual bit in hartsel stands for a hart. To check which harts exist,
+                        // openocd writes a 1 into each bit and reads back the result. The RISCV processor
+                        // will return the harts that have actually been selected, writing a 0 in bits for
+                        // harts that do not even exist! That way openocd can discover which harts exist!
+                        //
+                        // Here a system with a single hart is simulated so only a single bit will be 
+                        // return 1 (high), the others are set to 0 (low).
+
+                        // debug module is active
+                        dmactive = 1;
+
+                        // only a single hart exists, set only the very first bit in hartsello
+                        hartsello = 1;
+                        hartselhi = 0;
+
+                        // construct the response
+                        uint64_t debug_module_control = 
+                            (haltreq << 31) |
+                            (resumereq << 30) |
+                            (hartreset << 29) |
+                            (ackhavereset << 28) |
+                            (ackunavail << 27) |
+                            (hasel << 26) |
+                            (hartsello << 16) |
+                            (hartselhi << 6) |
+                            (setkeepalive << 5) |
+                            (clrkeepalive << 4) |
+                            (setresethaltreq << 3) |
+                            (clrresethaltreq << 2) |
+                            (ndmreset << 1) |
+                            (dmactive << 0);
+
+                        // success, the operation 0x00 used in a response is interpreted by openocd
+                        // as a successfull termination of the requested operation
+                        dmi_op = 0x00;
+
+                        // set a value into the dmi_container_register
+                        dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                            ((debug_module_control & 0xFFFFFFFF) << 2) | 
+                            ((dmi_op & 0b11) << 0);
+
+                    }
+
+                }
+
+            } else {
+
+                fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS -- [ERROR] UNKNOWN dmi_address!!!\n");
+
+            }
+            break;
+
+        default:
+            fprintf(stderr, "[Error] C Unknown instruction register!!!\n");
+            break;
+        }
+        break;
+
+    case UPDATE_IR:
+        // fprintf(stderr, "UPDATE_IR entered\n");
+        instruction_container_register = instruction_shift_register;
+        break;
+
+    default:
+        fprintf(stderr, "[Error] Unknown state!!!\n");
+        return;
     }
 }
 
@@ -436,11 +879,11 @@ void remote_bitbang_t::execute_command()
         {
             // // 48d == 0x30 == '0', 49 == 0x31 == '1'
             // //fprintf(stderr, "Sending %d\n", tosend);
-            // if (tosend == 0x30) {
-            //     fprintf(stderr, ">> 0\n");
-            // } else {
-            //     fprintf(stderr, ">> 1\n");
-            // }
+            if (tosend == 0x30) {
+                fprintf(stderr, "0 ");
+            } else {
+                 fprintf(stderr, "1 ");
+            }
 
             ssize_t bytes = write(client_fd, &tosend, sizeof(tosend));
             if (bytes == -1)
@@ -462,258 +905,6 @@ void remote_bitbang_t::execute_command()
         fprintf(stderr, "Remote end disconnected\n");
         close(client_fd);
         client_fd = 0;
-    }
-}
-
-void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_clk)
-{
-    // fprintf(stderr, "state_entered\n");
-
-    uint64_t dmi_address = 0x00;
-    uint64_t dmi_data = 0x00;
-    uint64_t dmi_op = 0x00;
-
-    switch (new_state)
-    {
-
-    // In this state all test-modes (for example extest-mode) are reset, which will disable their operation, allowing the chip to follow its normal operation.
-    case TEST_LOGIC_RESET:
-        // fprintf(stderr, "TEST_LOGIC_RESET entered\n");
-
-        // TODO: write IDCODE value into DR!
-        // see: https://openocd.org/doc/pdf/openocd.pdf#page=69&zoom=100,120,96
-        instruction_container_register = static_cast<uint8_t>(RiscV_DTM_Registers::JTAG_IDCODE);
-
-        break;
-
-    // This is the resting state during normal operation.
-    case RUN_TEST_IDLE:
-        // fprintf(stderr, "RUN_TEST_IDLE entered\n");
-        break;
-
-    // These are the starting states respectively for accessing one of the data registers
-    // (the boundary-scan or bypass register in the minimal configuration) or the instruction register.
-    case SELECT_DR_SCAN:
-        // fprintf(stderr, "SELECT_DR_SCAN entered\n");
-
-        // TODO: select the data register.
-        //
-        // The data register is a symbol register which means it points to another register.
-        //
-        // The real register that DR points to is specified via the IR register contents.
-        // Real registers are indexed vai the current value of IR. Therefore first load some
-        // value into IR then perform SELECT_DR_SCAN
-        //
-        // Remember: during TAP reset, IR is preloaded with the index of the IDCODE register!
-        // (Or also possible the bypass register). This means that after TAP reset, when activating
-        // The SELECT_DR_SCAN, the DR will point to the IDCODE register!
-        //
-        // Lets assume this simulated TAP enters IDCODE into IR on reset. This means during
-        // SELECT_DR_SCAN, the IDCODE register is selected.
-        //
-        // The result of all this selecting real registers is that whenever
-        break;
-    case SELECT_IR_SCAN:
-        // fprintf(stderr, "SELECT_IR_SCAN entered\n");
-        break;
-
-    // These capture the current value of one of the data registers or the instruction register respectively
-    // into the scan cells (= Shift register). This is a slight misnomer for the instruction register, since it is usual
-    // to capture status information, rather than the actual instruction with Capture-IR.
-    case CAPTURE_DR:
-        // fprintf(stderr, "CAPTURE_DR entered\n");
-
-        // TODO: copy the current value stored inside the selected [data container register] into the corresponding
-        // [data shift register].
-        //
-        // Real data registers always come in pairs. The pairs consist of a [data container register] and a
-        // [data shift register].
-        //
-        // There is a real [data container register] that stores the current value.
-        // Then there is the other element to the pair which is the [data shift register]
-        //
-        // The DR symbolic register points to the pair. When the DR symbolic register points
-        // onto a pair, the shift register of that pair is installed right in between the
-        // tdi and tdo ports. This means that the shift register will interact with the openocd
-        // JTAG client.
-        //
-        // The IR register pair is special. There is no symbolic pointer register that points to IR.
-        // All IR  state machines states implicitly operate on the IR register!
-        //
-        // This [data shift register] is the register that will get bit shifted in from
-        // tdi on the rising edge of the clock when in SHIFT_DR or SHIFT_IR state.
-        // The tdo value is taken on the falling edge of the clock from the shift register.
-        //
-        // There are operations to load a value from the [data container register] into the [data shift register].
-        // This operation is performed in the states CAPTURE_DR for the symbolic DR register and CAPTURE_IR respectively
-        // for the IR register.
-        //
-        // There is an operation to store the current value inside the data shift register back into the data container
-        // register. This operation is performed in the state UPDATE_DR and in the state UPDATE_IR for the IR register pair.
-        //
-        // The overall idea is that the data container register remains as is during shift operations because the
-        // shift operations only affect the data shift register. Once the client is happy with the data that they
-        // have shifted into the system, the client can decide to commit that data to the data container register
-        // by transitioning into the UPDATE_DR, UPDATE_IR states.
-        //
-        // In order to read from a register, the client has to first transition into the CAPTURE_DR or CAPTURE_IR
-        // states so that the data is copied from the data container registers into the shift registers, because the
-        // data that a client will receive from the system will always come from the data shift register and
-        // never directly from the data container register.
-
-        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
-        {
-
-        case RiscV_DTM_Registers::JTAG_IDCODE:
-            fprintf(stderr, "CAPTURE_DR - capturing IDCODE into id_code_shift_register\n");
-            id_code_shift_register = id_code_container_register;
-            break;
-
-            // TODO case for bypass
-
-        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
-            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DTM_CONTROL_AND_STATUS - capturing dtmcs_container_register into dtmcs_shift_register - ");
-            print_dtmcs(dtmcs_container_register);
-            
-            dtmcs_shift_register = dtmcs_container_register;
-
-            first_shift = 1;
-            break;
-
-        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
-            fprintf(stderr, "CAPTURE_DR - RISCV_DTM_REGISTERS::DEBUG_MODULE_INTERFACE_ACCESS - capturing dmi_container_register into dmi_shift_register - ");
-            print_dmi(dmi_container_register);
-            
-            dmi_shift_register = dmi_container_register;
-
-            first_shift = 0;
-            break;
-
-        default:
-            fprintf(stderr, "[Error] B Unknown instruction register!!!\n");
-            break;
-        }
-
-        break;
-    case CAPTURE_IR:
-        // fprintf(stderr, "CAPTURE_IR entered\n");
-
-        // copy data from the IR container register into the IR shift register.
-        // the length of the IR register can be specified via the openocd.cfg file.
-        // It is set to 8 in this example.
-        instruction_shift_register = static_cast<uint8_t>(instruction_container_register);
-        break;
-
-    // Shift a bit in from TDI (on the rising edge of TCK) and out onto TDO
-    // (on the falling edge of TCK) from the currently selected data or instruction register respectively.
-    case SHIFT_DR:
-        // fprintf(stderr, "SHIFT_DR entered.\n");
-        // the actual shifting is performed on the falling edge
-        break;
-
-    // Shift in a bit from tdi into IR (on the rising edge) and also out from the IR to tdi (on the falling edge)
-    case SHIFT_IR:
-        // fprintf(stderr, "SHIFT_IR entered. rising_edge_clk: %d. \n", rising_edge_clk);
-        // the actual shifting is performed on the falling edge
-        break;
-
-    // These are the exit states for the corresponding shift state.
-    // From here the state machine can either enter a pause state or enter the update state.
-    case EXIT1_DR:
-        // fprintf(stderr, "EXIT1_DR entered\n");
-        break;
-    case EXIT1_IR:
-        // fprintf(stderr, "EXIT1_IR entered\n");
-        break;
-
-    // Pause in shifting data into the data or instruction register.
-    // This allows for example test equipment supplying TDO to reload buffers etc.
-    case PAUSE_DR:
-        // fprintf(stderr, "PAUSE_DR entered\n");
-        break;
-    case PAUSE_IR:
-        // fprintf(stderr, "PAUSE_IR entered\n");
-        break;
-
-    // These are the exit states for the corresponding pause state.
-    // From here the state machine can either resume shifting or enter the update state.
-    case EXIT2_DR:
-        // fprintf(stderr, "EXIT2_DR entered\n");
-        break;
-    case EXIT2_IR:
-        // fprintf(stderr, "EXIT2_IR entered\n");
-        break;
-
-    // The value shifted into the scan cells during the previous states is driven into the chip (from inputs) 
-    // or onto the interconnect (for outputs).
-    case UPDATE_DR:
-        // fprintf(stderr, "UPDATE_DR entered\n");
-        switch (static_cast<RiscV_DTM_Registers>(instruction_container_register))
-        {
-
-        case RiscV_DTM_Registers::JTAG_IDCODE:
-            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::JTAG_IDCODE\n");
-            id_code_container_register = id_code_shift_register;
-            break;
-
-        case RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS:
-            // fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DTM_CONTROL_AND_STATUS\n");
-
-            // print before the change
-            print_dtmcs(dtmcs_container_register);
-
-            // DEBUG just activate this line again!
-            //dtmcs_container_register = dtmcs_shift_register;
-
-            // print after the change
-            print_dtmcs(dtmcs_container_register);
-            break;
-
-        case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
-            fprintf(stderr, "UPDATE_DR RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS\n");
-
-            // print before the change
-            print_dmi(dmi_container_register);
-
-            // DEBUG just activate this line again!
-            dmi_container_register = dmi_shift_register;
-
-            // print after the change
-            print_dmi(dmi_container_register);
-
-            dmi_address = get_dmi_address(dmi_container_register);
-            dmi_data = get_dmi_data(dmi_container_register);
-            dmi_op = get_dmi_op(dmi_container_register);
-
-            fprintf(stderr, "dmi_address: %ld, dmi_data: %ld, dmi_op: %ld\n", dmi_address, dmi_data, dmi_op);
-
-            // dmi_container_register = 0xFFFFFFFF;
-            // dmi_shift_register = 0xFFFFFFFF;
-
-            //dmi_container_register = 0x01;
-            //dmi_shift_register = 0x01;
-
-            //dmi_container_register = (0x01 << 2);
-            //dmi_shift_register = (0x01 << 2);
-
-            //dmi_container_register = 0x07ffffc1;
-            //dmi_shift_register = 0x07ffffc1;
-            break;
-
-        default:
-            fprintf(stderr, "[Error] C Unknown instruction register!!!\n");
-            break;
-        }
-        break;
-
-    case UPDATE_IR:
-        // fprintf(stderr, "UPDATE_IR entered\n");
-        instruction_container_register = instruction_shift_register;
-        break;
-
-    default:
-        fprintf(stderr, "[Error] Unknown state!!!\n");
-        return;
     }
 }
 
@@ -809,11 +1000,11 @@ uint64_t remote_bitbang_t::init_dmi() {
     // Address used for DMI access. In Update-DR this value is
     // used to access the DM over the DMI. op defines what this
     // register contains after every possible operation.
-    uint64_t address = 0x00;
+    uint64_t address = 0x10;
 
     // The data to send to the DM over the DMI during UpdateDR, and the data 
     // returned from the DM as a result of the previous operation.
-    uint64_t data = 0x00;
+    uint64_t data = 0x00000001;
 
     // When the debugger writes this field, it has the following meaning:
     //
@@ -882,5 +1073,22 @@ uint64_t remote_bitbang_t::get_dmi_data(uint64_t dmi) {
 uint64_t remote_bitbang_t::get_dmi_op(uint64_t dmi) {
     uint64_t op = ((dmi >> 0x00) & 0b11);
     return op;
+}
+
+std::string remote_bitbang_t::operation_as_string(uint64_t dmi_op) {
+    switch (dmi_op) {
+
+        case 0: 
+            return std::string("NOP");
+
+        case 1:
+            return std::string("READ");
+
+        case 2:
+            return std::string("WRITE");
+
+        default:
+            return std::string("UNKNOWN");
+    }
 }
 

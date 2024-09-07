@@ -5,6 +5,7 @@
 #include <thread>
 #include <stdint.h>
 #include <sys/types.h>
+#include <string>
 
 #include "tap_state_machine.h"
 
@@ -139,7 +140,7 @@ private:
     uint64_t dmi_container_register;
     uint64_t dmi_shift_register;
 
-    uint8_t first_shift{1};
+    uint8_t shift_amount{0};
 
     /// @brief Check for a client connecting, and accept if there is one.
     void accept();
@@ -173,6 +174,29 @@ private:
     uint64_t get_dmi_address(uint64_t dmi);
     uint64_t get_dmi_data(uint64_t dmi);
     uint64_t get_dmi_op(uint64_t dmi);
+
+    /// @brief Convert the operation into a string for debug output.
+    /// @param dmi_op the operation used in the DMI DebugModuleInterfaceAccess register. See RISC-V debug specification page 95,96.
+    /// @return a human readable name for the operation.
+    std::string operation_as_string(uint64_t dmi_op);
+
+
+
+
+    uint32_t haltreq = 0x00; // writing 0 clears the halt request for all currently selected harts. This may cancal outstanding halt requests for those harts.
+    uint32_t resumereq = 0x00;
+    uint32_t hartreset = 0x00;
+    uint32_t ackhavereset = 0x00;
+    uint32_t ackunavail = 0x00;
+    uint32_t hasel = 0x00;
+    uint32_t hartsello = 0x00; // ??? which (hardware thread) is selected
+    uint32_t hartselhi = 0x00;
+    uint32_t setkeepalive = 0x00;
+    uint32_t clrkeepalive = 0x00;
+    uint32_t setresethaltreq = 0x00;
+    uint32_t clrresethaltreq = 0x00;
+    uint32_t ndmreset = 0x00;
+    uint32_t dmactive = 0x00; // 0x00 module needs reset, 0x01 module functions normally.
 };
 
 #endif
