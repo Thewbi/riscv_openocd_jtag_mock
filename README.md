@@ -146,7 +146,7 @@ g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_m
 
 clear & ./a.out
 
-/home/wbi/openocd/bin/openocd -f remote_bitbang.cfg -d4 -l log
+/home/wbi/openocd/bin/openocd -d -f remote_bitbang.cfg -d4 -l log
 ```
 
 # Interpreting the commands that openocd sends
@@ -611,6 +611,15 @@ Debug: 454 10252 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading 
 Debug: 981 28972 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading register dpc
 ```
 
+
+
+load_image filename [address ['bin'|'ihex'|'elf'|'s19' [min_address [max_length]]]]
+
+```
+load_image tutorials/de0_nano/hello.elf
+load_image test.hex 0x00000000 ihex
+load_image hello_world_mt.hex 0x00000000 ihex
+``` 
 
 
 ## GNU Debugger (gdb)
@@ -1498,3 +1507,111 @@ xsvf (tapname|'plain') filename ['virt2'] ['quiet']
       'quiet' option, all comments, retries, and mismatches will be
       reported.
 ```
+
+
+
+
+
+
+## GCC toolchain for riscv
+
+### Building from source
+
+https://github.com/riscv-collab/riscv-gnu-toolchain
+https://stackoverflow.com/questions/74231514/how-to-install-riscv32-unknown-elf-gcc-on-debian-based-linuxes
+
+```
+sudo apt-get install autoconf automake autotools-dev curl python3 libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build
+
+sudo apt-get install autoconf automake autotools-dev curl python3 python3-pip libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build git cmake libglib2.0-dev libslirp-dev
+```
+
+```
+mkdir ~/dev
+cd dev
+mkdir riscv-toolchain
+cd riscv-toolchain
+
+git clone https://github.com/riscv/riscv-gnu-toolchain
+cd riscv-gnu-toolchain
+./configure --prefix=/opt/riscv --with-arch=rv32gc --with-abi=ilp32d
+make linux
+```
+
+See: https://github.com/martinKindall/compile-for-risc-v-gnu
+
+Example C-Code (example.c):
+
+```
+int main() {
+
+    int anumber = 5;
+    int another = 30;
+
+    int result = anumber + another;
+
+    return 0;
+}
+```
+
+
+```
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -r example.c -o example.o
+/opt/riscv/bin/riscv32-unknown-linux-gnu-ld -o example.elf -T linker_script.ld -m elf32lriscv -nostdlib --no-relax
+```
+
+Convert elf to bin using riscv32-unknown-linux-gnu-objcopy
+```
+/opt/riscv/bin/riscv32-unknown-linux-gnu-objcopy -O binary example.elf example.bin
+```
+
+Convert elf to ihex using riscv32-unknown-linux-gnu-objcopy
+```
+/opt/riscv/bin/riscv32-unknown-linux-gnu-objcopy -O ihex example.elf example.hex
+```
+
+Convert bin to a hexdump (this is not the ihex format!)
+``` 
+hexdump -e '"%08x\n"' example.bin > example.hex
+```
+
+Convert elf to hex using riscv32-unknown-elf-elf2hex (might not be available without explicit installation)
+``` 
+riscv32-unknown-elf-elf2hex --bit-width 32 --input example.elf --output example.hex
+```
+
+Load hex file with openocd into the target.
+```
+load_image create_binary_example/example.hex 0x00000000 ihex
+```
+
+
+Write a single memory cell
+```
+write_memory address width data
+write_memory 0x01 32 0x22
+```
+
+```
+riscv info
+```
+
+
+openocd log output is
+
+```
+Debug: 20189 35864 command.c:153 script_debug(): command - load_image create_binary_example/example.hex 0x00000000 ihex
+Debug: 20190 35864 configuration.c:88 find_file(): found create_binary_example/example.hex
+Debug: 20191 176208 target.c:2350 target_write_buffer(): writing buffer of 229 byte at 0x00000000
+```
+
+The access_memory_command() will first write the target address into 
+data3 data3 data2 data2
+
+
+
+### Install prebuild binaries gcc-riscv64-linux-gnu
+
+https://www.youtube.com/watch?v=GWiAQs4-UQ0
+
+sudo apt install gcc-riscv64-linux-gnu

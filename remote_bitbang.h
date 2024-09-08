@@ -266,6 +266,23 @@ private:
 
     std::string riscv_register_as_string(uint32_t register_index);
 
+    uint64_t abstract_data_0 = 0x00;
+    uint64_t abstract_data_1 = 0x00;
+    uint64_t abstract_data_2 = 0x00;
+    uint64_t abstract_data_3 = 0x00;
+    uint64_t abstract_data_4 = 0x00;
+    uint64_t abstract_data_5 = 0x00;
+    uint64_t abstract_data_6 = 0x00;
+    uint64_t abstract_data_7 = 0x00;
+    uint64_t abstract_data_8 = 0x00;
+    uint64_t abstract_data_9 = 0x00;
+    uint64_t abstract_data_10 = 0x00;
+    uint64_t abstract_data_11 = 0x00;
+
+    uint64_t arg0 = 0x00;
+    uint64_t arg1 = 0x00;
+    uint64_t arg2 = 0x00;
+
 };
 
 #endif

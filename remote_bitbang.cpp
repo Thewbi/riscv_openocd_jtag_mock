@@ -532,8 +532,23 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // of them are implemented, starting at data0 counting up. 
                 //
                 // Table 2 shows how abstract commands use these registers.
+
+                // // aampostincrement
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) WRITE \n");
+                // }
+
+                //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                abstract_data_0 = dmi_data;
             
-            } // 0x05 (Abstract Data 1 (data1))
+            } 
+            // 0x05 (Abstract Data 1 (data1))
             else if (dmi_address == 0x05) {
 
                 // data 0 through data 11 (Registers data 0 - data 11) are registers that may
@@ -541,8 +556,174 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // of them are implemented, starting at data0 counting up. 
                 //
                 // Table 2 shows how abstract commands use these registers.
+
+                // // aampostincrement
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) WRITE \n");
+                // }
+
+                //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                abstract_data_1 = dmi_data;
             
             }
+            // 0x06 (Abstract Data 2 (data2)) 
+            else if (dmi_address == 0x06) {
+
+                // // aampostincrement
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) WRITE \n");
+                // }
+
+                //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                abstract_data_2 = dmi_data;
+            }
+            // 0x07 (Abstract Data 3 (data3))
+            else if (dmi_address == 0x07) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) WRITE \n");
+                // }
+
+                abstract_data_3 = dmi_data;
+            }
+
+            // 0x08 (Abstract Data 4 (data4))
+            else if (dmi_address == 0x08) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) WRITE \n");
+                // }
+
+                abstract_data_4 = dmi_data;
+            }
+
+            // 0x09 (Abstract Data 5 (data5))
+            else if (dmi_address == 0x09) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) WRITE \n");
+                // }
+
+                abstract_data_5 = dmi_data;
+            }
+
+            // 0x0a (Abstract Data 6 (data6))
+            else if (dmi_address == 0x0a) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) WRITE \n");
+                // }
+
+                abstract_data_6 = dmi_data;
+            }
+
+            // 0x0b (Abstract Data 7 (data7))
+            else if (dmi_address == 0x0b) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) WRITE \n");
+                // }
+
+                abstract_data_7 = dmi_data;
+            }
+
+            // 0x0c (Abstract Data 8 (data8))
+            else if (dmi_address == 0x0c) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) WRITE \n");
+                // }
+
+                abstract_data_8 = dmi_data;
+            }
+
+            // 0x0d (Abstract Data 9 (data9))
+            else if (dmi_address == 0x0d) {
+                
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) WRITE \n");
+                // }
+
+                abstract_data_9 = dmi_data;
+            }
+
+            // 0x0e (Abstract Data 10 (data10))
+            else if (dmi_address == 0x0e) {
+                
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) WRITE \n");
+                // }
+
+                abstract_data_10 = dmi_data;
+            }
+
+            // 0x0f (Abstract Data 11 (data11))
+            else if (dmi_address == 0x0f) {
+
+                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) \n");
+                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
+
+                // if (dmi_op == 0x01) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) READ \n");
+                // } else if (dmi_op == 0x02) {
+                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) WRITE \n");
+                // }
+
+                abstract_data_11 = dmi_data;
+            }
+
             // 0x10 == DebugModule Control Register (DebugSpec, Page 26 and Page 30)
             else if (dmi_address == 0x10) {
                 
@@ -813,7 +994,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // after this, in the logs of openocd (log level -d4) there should be an output similar to this:
                 // "Debug: 2755 50698 riscv-013.c:411 riscv_log_dmi_scan(): read: dmstatus=0x283 {version=1_0 authenticated=true allhalted=1}"
             
-            } // 3.14.6. Abstract Control and Status (abstractcs, at 0x16)
+            } 
+            // 3.14.6. Abstract Control and Status (abstractcs, at 0x16)
             else if (dmi_address == 0x16) {
 
                 // read operation
@@ -900,7 +1082,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                 }
 
-            } // 3.14.7. Abstract Command (command, at 0x17)
+            } 
+            // 3.14.7. Abstract Command (command, at 0x17)
             else if (dmi_address == 0x17) {
 
                 // Register 0x17 is first written to start an abstract command to read a register for example.
@@ -958,6 +1141,38 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         uint32_t aarpostincrement = (control >> 19) & 0x01;
                         uint32_t aarsize = (control >> 20) & 0b111;
 
+                        if (aarsize == 2) {
+                            // 32 bit
+                        } else if (aarsize == 3) {
+                            // 64 bit
+
+                            // output error, this system is 32 bit
+
+                            // if any of these operations fail, cmderr is set 
+                            // and none of the remaining steps are executed.
+
+                            // if a command has unsupported options set or if bits that are
+                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                            cmderr = 0x02;
+
+                            // // set a value into the dmi_container_register
+                            // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                            //     ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
+                            //     ((dmi_op & 0b11) << 0);
+
+                        } else if (aarsize == 4) {
+                            // 128 bit
+
+                            // output error, this system is 32 bit
+
+                            // if any of these operations fail, cmderr is set 
+                            // and none of the remaining steps are executed.
+
+                            // if a command has unsupported options set or if bits that are
+                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                            cmderr = 0x02;
+                        }
+
                         //if ((regno != 0x01) && (regno != 0x08)) {
                         //    fprintf(stderr, "\nACCESS REGISTER COMMAND regno:%d\n", regno);
                         //}
@@ -967,12 +1182,71 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                     } else if (cmdtype == 0x01) {
 
                         // 3.7.1.2. Quick Access
-                        //fprintf(stderr, "\nQUICK_ACCESS\n");
+                        fprintf(stderr, "\nQUICK_ACCESS\n");
 
                     } else if (cmdtype == 0x02) {
 
-                        // 3.7.1.3. Access Memory
-                        // fprintf(stderr, "\nACCESS_MEMORY_COMMAND\n");
+                        // 3.7.1.3. Access Memory, page 20
+                        //fprintf(stderr, "\nACCESS_MEMORY_COMMAND\n");
+
+                        // This table defines what registers are used for arg0, arg1 and arg2
+                        //
+                        // "Table 2 Use of Data Registers", DebugSpec, page 17
+                        //
+                        // Note: this table seems to be incorrect in the spec! OpenOCD uses the 64 bit
+                        // row for 32 bit width! I'll tell mum...
+                        //
+                        // argument width | arg0 (return) | arg1         | arg2
+                        // 32  (size==2)  | data0         | data1        | data2
+                        // 64  (size==3)  | data0, data1  | data2, data3 | data4, data5
+                        // 128 (size==4)  | data0+1+2+3   | data4+5+6+7  | data8+9+10+11
+
+                        // before this code here is executed, the remote debugger has loaded:
+                        // arg1 into the register 0x06 (Abstract Data 2 (data2))
+                        // arg0 into the register 0x07 (Abstract Data 3 (data3))
+                        //
+                        // if this command is a write command, the requested semantics are
+                        // to write the value stored inside Abstract Data 2 to the memory
+                        // at the address stored in Abstract Data 3
+                        //
+                        // see Debug Spec, page 20 and page21
+
+                        uint32_t aamvirtual = ((dmi_data >> 23) & 0b1);
+                        uint32_t aamsize = ((dmi_data >> 20) & 0b111);
+                        uint32_t aampostincrement = ((dmi_data >> 19) & 0b1);
+                        uint32_t write = ((dmi_data >> 16) & 0b1);
+                        uint32_t target_specific = ((dmi_data >> 14) & 0b11);
+
+                        if (write) {
+
+                            if (aamsize == 2) {
+                                arg0 = abstract_data_0;
+                                arg1 = abstract_data_1;
+
+                                // arg0 = abstract_data_1 << 32 | abstract_data_0;
+                                // arg1 = abstract_data_3 << 32 | abstract_data_2;
+                            }
+
+                            if (aamsize == 3) {
+                                arg0 = abstract_data_0 << 32 | abstract_data_1;
+                                arg1 = abstract_data_2 << 32 | abstract_data_3;
+                            }
+
+                            fprintf(stderr, "\nACCESS_MEMORY_COMMAND +++ WRITE 0x%08lx -> 0x%08lx \n", arg0, arg1);
+                        } else {
+                            fprintf(stderr, "\nACCESS_MEMORY_COMMAND +++ READ \n");
+                        }
+
+                        // if (aampostincrement) {
+                        //     uint64_t increment = (2^(aamsize+3));
+                        //     abstract_data_2 += increment;
+                        //     abstract_data_3 += increment;
+                        // }
+
+                        // // set a value into the dmi_container_register
+                        // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                        //     ((debug_module_status & 0xFFFFFFFF) << 2) | 
+                        //     ((dmi_op & 0b11) << 0);
                         
                     }
 
