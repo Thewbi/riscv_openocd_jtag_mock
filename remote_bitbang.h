@@ -263,6 +263,9 @@ private:
     // Number of data registers that are implemented as part of
     // the abstract command interface. Valid sizes are 1 — 12.
     uint32_t datacount = 0x00;
+
+    std::string riscv_register_as_string(uint32_t register_index);
+
 };
 
 #endif
