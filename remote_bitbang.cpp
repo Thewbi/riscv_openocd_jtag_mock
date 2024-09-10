@@ -537,15 +537,28 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) \n");
                 // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
 
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) WRITE \n");
-                // }
+                if (dmi_op == 0x01) {
+
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) READ \n");
+                    dmi_data = abstract_data_0;
+
+                    // success, the operation 0x00 used in a response is interpreted by openocd
+                    // as a successfull termination of the requested operation
+                    dmi_op = 0x00;
+
+                    // set a value into the dmi_container_register
+                    dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                        ((dmi_data & 0xFFFFFFFF) << 2) | 
+                        ((dmi_op & 0b11) << 0);
+
+                } else if (dmi_op == 0x02) {
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) WRITE \n");
+                    abstract_data_0 = dmi_data;
+                }
 
                 //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
 
-                abstract_data_0 = dmi_data;
+                
             
             } 
             // 0x05 (Abstract Data 1 (data1))
@@ -610,11 +623,11 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) \n");
                 // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
 
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) WRITE \n");
-                // }
+                if (dmi_op == 0x01) {
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) READ \n");
+                } else if (dmi_op == 0x02) {
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) WRITE \n");
+                }
 
                 abstract_data_4 = dmi_data;
             }
@@ -1091,10 +1104,37 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // the resulting value is then read from register 0x04 for 32 bit and from
                 // register 0x04 and 0x05 for 64 bit.
 
+                // cmdtype: 0, control: 3280904
+                uint32_t cmdtype = ((dmi_data >> 24) & 0xFF);
+                uint32_t control = ((dmi_data >> 0) & 0xFFFFFF);
+
                 // read operation
                 if (dmi_op == 0x01) {
 
                     //fprintf(stderr, "\nAbstract Command READ\n");
+
+                    uint32_t regno = (control >> 0) & 0xFFFF;
+                    uint32_t write = (control >> 16) & 0x01;
+                    uint32_t transfer = (control >> 17) & 0x01;
+                    uint32_t postexec = (control >> 18) & 0x01;
+                    uint32_t aarpostincrement = (control >> 19) & 0x01;
+                    uint32_t aarsize = (control >> 20) & 0b111;
+
+                    // CSR_MISA register
+                    if (regno == 0x301) {
+
+                        // Register 0x17 is first written to start an abstract command to read a register for example.
+                        // Register 0x16 is then polled to see if the command has terminated
+                        // the resulting value is then read from register 0x04 for 32 bit and from
+                        // register 0x04 and 0x05 for 64 bit.
+
+                        // read operation
+                        fprintf(stderr, "read CSR_MISA (0x301)\n");
+
+                        //                  MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
+                        abstract_data_0 = 0b01000000000000000000000100101000;
+        
+                    }
 
                     // The type determines the overall functionality of this abstract command.
                     uint32_t cmdtype = 0x00;
@@ -1122,10 +1162,6 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                     //cmderr = 0x01;
                     cmderr = 0x00;
-                    
-                    // cmdtype: 0, control: 3280904
-                    uint32_t cmdtype = ((dmi_data >> 24) & 0xFF);
-                    uint32_t control = ((dmi_data >> 0) & 0xFFFFFF);
 
                     //fprintf(stderr, "\ncmdtype: %d, control: %d\n", cmdtype, control);
 
@@ -1134,51 +1170,73 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         // 3.7.1.1. Access Register, page 18
                         //fprintf(stderr, "\nACCESS REGISTER COMMAND\n");
 
-                        uint32_t regno = (control >> 0) & 0xFF;
+                        uint32_t regno = (control >> 0) & 0xFFFF;
                         uint32_t write = (control >> 16) & 0x01;
                         uint32_t transfer = (control >> 17) & 0x01;
                         uint32_t postexec = (control >> 18) & 0x01;
                         uint32_t aarpostincrement = (control >> 19) & 0x01;
                         uint32_t aarsize = (control >> 20) & 0b111;
 
-                        if (aarsize == 2) {
-                            // 32 bit
-                        } else if (aarsize == 3) {
-                            // 64 bit
+                        fprintf(stderr, "\nACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
-                            // output error, this system is 32 bit
+                        // CSR_MISA register
+                        if (regno == 0x301) {
 
-                            // if any of these operations fail, cmderr is set 
-                            // and none of the remaining steps are executed.
+                            // Register 0x17 is first written to start an abstract command to read a register for example.
+                            // Register 0x16 is then polled to see if the command has terminated
+                            //
+                            // The resulting value is then read from register 0 (0x04) for 32 bit 
+                            // and from register 0 (0x04) and 1 (0x05) for 64 bit.
 
-                            // if a command has unsupported options set or if bits that are
-                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
-                            cmderr = 0x02;
+                            if (write == 0) {
+                                fprintf(stderr, "read CSR_MISA (0x301)\n");
 
-                            // // set a value into the dmi_container_register
-                            // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
-                            //     ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
-                            //     ((dmi_op & 0b11) << 0);
+                                //                  MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
+                                abstract_data_0 = 0b01000000000000000000000100101000;
 
-                        } else if (aarsize == 4) {
-                            // 128 bit
+                            } else  if(write == 1) {
+                                 fprintf(stderr, "write CSR_MISA (0x301)\n");
+                            }
+            
+                        } else {
 
-                            // output error, this system is 32 bit
+                            // perform "separate non-standard mechanism" to determine XLEN (register size)
 
-                            // if any of these operations fail, cmderr is set 
-                            // and none of the remaining steps are executed.
+                            if (aarsize == 2) {
+                                // 32 bit
+                            } else if (aarsize == 3) {
+                                // 64 bit
 
-                            // if a command has unsupported options set or if bits that are
-                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
-                            cmderr = 0x02;
+                                // output error, this system is 32 bit
+
+                                // if any of these operations fail, cmderr is set 
+                                // and none of the remaining steps are executed.
+
+                                // if a command has unsupported options set or if bits that are
+                                // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                                cmderr = 0x02;
+
+                                // // set a value into the dmi_container_register
+                                // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                                //     ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
+                                //     ((dmi_op & 0b11) << 0);
+
+                            } else if (aarsize == 4) {
+                                // 128 bit
+
+                                // output error, this system is 32 bit
+
+                                // if any of these operations fail, cmderr is set 
+                                // and none of the remaining steps are executed.
+
+                                // if a command has unsupported options set or if bits that are
+                                // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                                cmderr = 0x02;
+                            }
+
                         }
 
-                        //if ((regno != 0x01) && (regno != 0x08)) {
-                        //    fprintf(stderr, "\nACCESS REGISTER COMMAND regno:%d\n", regno);
-                        //}
-
-                        fprintf(stderr, "\nACCESS REGISTER COMMAND regno: %d, ABI-Name: %s\n", regno, riscv_register_as_string(regno).c_str());
-
+                        
                     } else if (cmdtype == 0x01) {
 
                         // 3.7.1.2. Quick Access
@@ -1232,9 +1290,9 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                                 arg1 = abstract_data_2 << 32 | abstract_data_3;
                             }
 
-                            fprintf(stderr, "\nACCESS_MEMORY_COMMAND +++ WRITE 0x%08lx -> 0x%08lx \n", arg0, arg1);
+                            fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ WRITE 0x%08lx -> 0x%08lx \n", arg0, arg1);
                         } else {
-                            fprintf(stderr, "\nACCESS_MEMORY_COMMAND +++ READ \n");
+                            fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ READ \n");
                         }
 
                         // if (aampostincrement) {
@@ -1818,6 +1876,17 @@ std::string remote_bitbang_t::dm_register_as_string(uint32_t address) {
 
 std::string remote_bitbang_t::riscv_register_as_string(uint32_t register_index) {
 
+    // check riscv-openocd source code:
+    //
+    // src/target/riscv/riscv-013.c
+    // uint32_t riscv013_access_register_command(struct target *target, uint32_t number, unsigned size, uint32_t flags)
+    //
+    // subtract the offset of 0x1000 that openocd adds when registers are requested with a value larger than or equal
+    // t0 0x1000. I do not know what the reasoning behind this offset is yet!
+    if (register_index >= 0x1000) {
+        register_index -= 0x1000;
+    }
+
     switch (register_index) {
 
         case 0: return "zero";
@@ -1828,7 +1897,7 @@ std::string remote_bitbang_t::riscv_register_as_string(uint32_t register_index) 
         case 5: return "t0";
         case 6: return "t1";
         case 7: return "t2";
-        case 8: return "fp";
+        case 8: return "s0/fp";
         case 9: return "s1";
         case 10: return "a0";
         case 11: return "a1";
@@ -1852,6 +1921,93 @@ std::string remote_bitbang_t::riscv_register_as_string(uint32_t register_index) 
         case 29: return "t4";
         case 30: return "t5";
         case 31: return "t6";
+
+        // Privileged Machine CSR addresses.
+        // #define CSR_MSTATUS 0x300
+        case 0x0300: return "CSR_MSTATUS 0x0300";
+
+        // Privileged Machine CSR addresses.
+        // #define CSR_MISA 0x301
+        //
+        // Found in riscv-gdb source code: gdb/include/opcode/riscv-opc.h
+        case 0x0301: return "CSR_MISA 0x301 - Machine ISA register (misa)";
+
+        // https://drive.google.com/file/d/1joBC2hWGEHJL4tFabjcqMpRqQNkqJ5WR/view
+        // RISC-V Advanced Interrupt Architecture V1.0
+        case 0x035c: return "0x035c Machine top external interrupt (only with an IMSIC) (mtopei)";
+
+        // Number Privilege Width Name Description
+
+        // Machine-Level Window to Indirectly Accessed Registers
+        // 0x350 MRW XLEN miselect Machine indirect register select
+        // 0x351 MRW XLEN mireg Machine indirect register alias
+
+        // Machine-Level Interrupts
+
+        // 0x304 MRW 64 mie Machine interrupt-enable bits
+        // 0x344 MRW 64 mip Machine interrupt-pending bits
+        // 0x35C MRW MXLEN mtopei Machine top external interrupt (only with an
+
+        // IMSIC)
+
+        // 0xFB0 MRO MXLEN mtopi Machine top interrupt
+        // Delegated and Virtual Interrupts for Supervisor Level
+        // 0x303 MRW 64 mideleg Machine interrupt delegation
+        // 0x308 MRW 64 mvien Machine virtual interrupt enables
+        // 0x309 MRW 64 mvip Machine virtual interrupt-pending bits
+
+        // Machine-Level High-Half CSRs (RV32 only)
+
+        // 0x313 MRW 32 midelegh Upper 32 bits of of mideleg (only with S-mode)
+        // 0x314 MRW 32 mieh Upper 32 bits of mie
+        // 0x318 MRW 32 mvienh Upper 32 bits of mvien (only with S-mode)
+        // 0x319 MRW 32 mviph Upper 32 bits of mvip (only with S-mode)
+        // 0x354 MRW 32 miph Upper 32 bits of mip
+
+        
+
+        // https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf
+        // 5.2.2 Trigger Data 1 (tdata1, at 0x7a1) . . . . . . . . . . . . . . . . . . . . . . . . 50
+        // 5.2.3 Trigger Data 2 (tdata2, at 0x7a2) . . . . . . . . . . . . . . . . . . . . . . . . 50
+        // 5.2.4 Trigger Data 3 (tdata3, at 0x7a3) . . . . . . . . . . . . . . . . . . . . . . . . 51
+        // 5.2.5 Trigger Info (tinfo, at 0x7a4) . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+        // 5.2.6 Trigger Control (tcontrol, at 0x7a5) . . . . . . . . . . . . . . . . . . . . . . 51
+        // 5.2.7 Machine Context (mcontext, at 0x7a8) . . . . . . . . . . . . . . . . . . . . . 52
+        // 5.2.8 Supervisor Context (scontext, at 0x7aa) . . . . . . . . . . . . . . . . . . . . 52
+        // 5.2.9 Match Control (mcontrol, at 0x7a1) . . . . . . . . . . . . . . . . . . . . . . . 53
+        // 5.2.10 Instruction Count (icount, at 0x7a1) . . . . . . . . . . . . . . . . . . . . . . 58
+        // 5.2.11 Interrupt Trigger (itrigger, at 0x7a1) . . . . . . . . . . . . . . . . . . . . . 59
+        // 5.2.12 Exception Trigger (etrigger, at 0x7a1) . . . . . . . . . . . . . . . . . . . . . 60
+        // 5.2.13 Trigger Extra (RV32) (textra32, at 0x7a3) . . . . . . . . . . . . . . . . . . . 60
+        // 5.2.14 Trigger Extra (RV64) (textra64, at 0x7a3) . . . . . . . . . . . . . . . . . . . 61
+
+        case 0x07b0: return "Debug Control and Status (dcsr, at 0x7b0)";
+        case 0x07b1: return "Debug PC (dpc, at 0x7b1)";
+        case 0x07b2: return "Debug Scratch Register 0 (dscratch0, at 0x7b2)";
+        case 0x07b3: return "Debug Scratch Register 1 (dscratch1, at 0x7b3)";
+
+        // Found in riscv-gdb (gdb/include/opcode/riscv-opc.h)
+        // /* Unprivileged Vector CSR addresses.  */
+        // #define CSR_VSTART 0x008
+        // #define CSR_VXSAT 0x009
+        // #define CSR_VXRM 0x00a
+        // #define CSR_VCSR 0x00f
+        // #define CSR_VL 0xc20
+        // #define CSR_VTYPE 0xc21
+        // #define CSR_VLENB 0xc22
+        // 3106d = 0x0C22
+        case 0x0c22: return "SR_VLENB 0xc22";
+
+        // RISC-V Advanced Interrupt Architecture	June 2023	Smaia, Ssaia
+        // https://wiki.riscv.org/display/HOME/Ratified+Extensions
+        //
+        // Machine Level CSRs:
+        // 
+        case 0x0fb0: return "0x0fb0 - Machine Top Interrupt (mtopi)";
+
+        // 4104d == 0x1008
+        // Debug: 153 2980 riscv-013.c:703 riscv013_execute_abstract_command(): [riscv.cpu0] access register=0x321008 {regno=0x1008 write=arg0 transfer=enabled postexec=disabled aarpostincrement=disabled aarsize=64bit}
+        case 0x1008: return "s0/fp + gdb offset of 0x1000. I do not know why!";
 
         default: return "UNKNOWN";
 

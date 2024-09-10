@@ -1,5 +1,4 @@
-// /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -r example.c -o example.o
-// 
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -g example.c -o example.elf
 int main() {
 
     int anumber = 5;
@@ -7,5 +6,5 @@ int main() {
 
     int result = anumber + another;
 
-    return 0;
+    return result;
 }

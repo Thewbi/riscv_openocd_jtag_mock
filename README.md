@@ -543,6 +543,90 @@ static int riscv_examine(struct target *target)
 
 
 
+## How openocd determines xlen
+
+Source: https://riscv.org/wp-content/uploads/2017/05/riscv-privileged-v1.10.pdf
+Source: https://forums.sifive.com/t/what-is-the-right-way-to-read-misa-register/3939/5
+
+I think that the standard approach to determining a RISC-V CPU's ISA (???)
+is to read the misa register (0x301). It will contain XLEN (= the CPU's bit width, 32, 64, 128)
+and also which extensions the CPU supports.
+
+Remember: When an external debugger reads the misa register, it does not know, what XLEN is yet.
+This means it does not know how many bits the misa register really has! The information is therefore
+stored at the leftmost border and at the rightmost border!
+
+The first two (most significant) bits (MXL) contain the XLEN which is decoded using the table below:
+
+MXL XLEN
+1   32
+2   64
+3   128
+
+The ISA is encoded using the 26 letters of the alphabet which are encoded as a bitfield:
+This bit field is stored using the least significant bits, that means at the right border of the misa register.
+
+Bit   Character Description
+0     A Atomic extension
+1     B Tentatively reserved for Bit operations extension
+2     C Compressed extension
+3     D Double-precision floating-point extension
+4     E RV32E base ISA
+5     F Single-precision floating-point extension
+6     G Additional standard extensions present (IMAFD)
+7     H Reserved
+8     I RV32I/64I/128I base ISA
+9     J Tentatively reserved for Dynamically Translated Languages extension
+10    K Reserved
+11    L Tentatively reserved for Decimal Floating-Point extension
+12    M Integer Multiply/Divide extension
+13    N User-level interrupts supported
+14    O Reserved
+15    P Tentatively reserved for Packed-SIMD extension
+16    Q Quad-precision floating-point extension
+17    R Reserved
+18    S Supervisor mode implemented
+19    T Tentatively reserved for Transactional Memory extension
+20    U User mode implemented
+21    V Tentatively reserved for Vector extension
+22    W Reserved
+23    X Non-standard extensions present
+24    Y Reserved
+25    Z Reserved
+
+If the misa register is not implemented (CPU returns 0x00), then the external debugger
+has to use a "separate non-standard mechanism". (see https://riscv.org/wp-content/uploads/2017/05/riscv-privileged-v1.10.pdf)
+
+OpenOCD tries to request the value in register s0 using a width of 64 bit.
+When a 32 RISCV cpu receives this request, then it has to answer with an error.
+OpenOCD then falls back to 32bit.
+OpenOCD does not even consider RISC 128bit as an option!
+
+```
+static int examine_xlen(struct target *target)
+{
+	RISCV_INFO(r);
+	unsigned int cmderr;
+
+	const uint32_t command = riscv013_access_register_command(target,
+			GDB_REGNO_S0, /* size */ 64, AC_ACCESS_REGISTER_TRANSFER);
+	int res = riscv013_execute_abstract_command(target, command, &cmderr);
+	if (res == ERROR_OK) {
+		r->xlen = 64;
+		return ERROR_OK;
+	}
+	if (res == ERROR_TIMEOUT_REACHED)
+		return ERROR_FAIL;
+	r->xlen = 32;
+
+	return ERROR_OK;
+}
+```
+
+
+
+
+
 ## Resetting the DM
 
 Through the DMI register, the external debugger (ED) can talk to the RISC-V DM.
@@ -622,30 +706,7 @@ load_image hello_world_mt.hex 0x00000000 ihex
 ``` 
 
 
-## GNU Debugger (gdb)
 
-Start gdb:
-
-```
-gdb
-```
-
-Connect gdb to openocd:
-
-```
-target remote localhost:3333
-target extended-remote localhost:3333
-```
-
-```
-info registers
-```
-
-Stop gdb:
-
-```
-quit
-```
 
 
 ## Telnet into openocd
@@ -655,6 +716,60 @@ telnet 127.0.0.1 4444
 telnet localhost 4444
 help
 ```
+
+
+```
+sleep msec [busy]
+halt [ms]
+wait_halt [ms]
+resume [address]
+
+step [address]
+example:
+step 0x00
+
+reset
+reset run
+reset halt
+reset init
+soft_reset_halt
+
+# Display contents of address addr, as 64-bit doublewords (mdd), 32-bit words (mdw),
+16-bit halfwords (mdh), or 8-bit bytes (mdb).
+mdd [phys] addr [count]
+mdw [phys] addr [count]
+mdh [phys] addr [count]
+mdb [phys] addr [count]
+
+# Writes the specified doubleword (64 bits), word (32 bits), halfword (16 bits), or byte
+(8-bit) value, at the specified address addr.
+mwd [phys] addr doubleword [count]
+mww [phys] addr word [count]
+mwh [phys] addr halfword [count]
+mwb [phys] addr byte [count]
+
+dump_image filename address size
+load_image filename address [[bin|ihex|elf|s19] min_addr max_length]
+
+# With no parameters, lists all active breakpoints. 
+# Else sets a breakpoint on code execution starting at address for length bytes. 
+bp [address len [hw]]
+example:
+bp 0x00 4
+
+# Remove the breakpoint at address.
+rbp address
+
+# Remove data watchpoint on address
+rwp address
+
+# With no parameters, lists all active watchpoints. 
+# Else sets a data watchpoint on data from address for length bytes.
+wp [address len [(r|w|a) [value [mask]]]]
+``` 
+
+
+
 
 Working:
 
@@ -1526,6 +1641,14 @@ sudo apt-get install autoconf automake autotools-dev curl python3 libmpc-dev lib
 sudo apt-get install autoconf automake autotools-dev curl python3 python3-pip libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build git cmake libglib2.0-dev libslirp-dev
 ```
 
+Supported ABIs are 
+ilp32 (32-bit soft-float), 
+ilp32d (32-bit hard-float), 
+ilp32f (32-bit with single-precision in registers and double in memory, niche use only), 
+lp64 
+lp64f 
+lp64d (same but with 64-bit long and pointers).
+
 ```
 mkdir ~/dev
 cd dev
@@ -1534,9 +1657,59 @@ cd riscv-toolchain
 
 git clone https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
+
+%% This toolchain causes the error: bfd requires flen 8, but target has flen 0 
+%% when debugging the executable with gdb. This error goes away, when from the misa register, 
+%% the RISC-V CPU returns that it supports the F and D extensions.
+%%
+%% It seems as if the gdb contained in the repository only works with riscv cpus that
+%% support floating point in one way or another.
+%%
+%% How does gdb talk to openocd and openocd to the CPU to figure out that the 
+%% CPU has no floating point support? How does it work?
 ./configure --prefix=/opt/riscv --with-arch=rv32gc --with-abi=ilp32d
-make linux
+
+%% Use this command for float (Combats error: bfd requires flen 8, but target has flen 0, see 
+%% https://github.com/riscv-software-src/riscv-isa-sim/issues/380)
+%% This error goes away, when from the misa register, 
+%% the RISC-V CPU returns that it supports the F and D extensions.
+%%
+%% Warning: this will fail with: 
+%% In file included from 
+%% /home/wbi/dev/riscv-toolchain/riscv-gnu-toolchain/build-gcc-linux-stage2/gcc/include-fixed/pthread.h:36,
+%%                  from ./gthr-default.h:35,
+%%                  from ../../.././gcc/libgcc/gthr.h:148,
+%%                  from ../../.././gcc/libgcc/libgcov-interface.c:27:
+%% /opt/riscv/sysroot/usr/include/bits/setjmp.h:35:3: error: #error unsupported FLEN
+%%    35 | # error unsupported FLEN
+%%       |   ^~~~~
+./configure --prefix=/opt/riscv --with-arch=rv32if --with-abi=ilp32f
+
+%% use this for no floating point hardware
+%%
+%% Warning: this will fail with:
+%% In file included from /opt/riscv/sysroot/usr/include/features.h:535,
+%%                  from /opt/riscv/sysroot/usr/include/bits/libc-header-start.h:33,
+%%                  from /opt/riscv/sysroot/usr/include/stdio.h:28,
+%%                  from ../../.././gcc/libgcc/../gcc/tsystem.h:87,
+%%                  from ../../.././gcc/libgcc/libgcc2.c:27:
+%% /opt/riscv/sysroot/usr/include/gnu/stubs.h:8:11: fatal error: gnu/stubs-ilp32.h: No such file or directory
+%%     8 | # include <gnu/stubs-ilp32.h>
+./configure --prefix=/opt/riscv --with-arch=rv32i --with-abi=ilp32
+
+sudo make linux
 ```
+
+--with-arch=rv32imcf,
+
+--with-arch=rv64imac
+
+M für Ganzzahl-Multiplikation und -Division
+A für atomare Speicheroperationen in Multiprozessorsystemen
+F, D und Q für Gleitkommaoperationen nach IEEE 754: binary32, binary64 bzw. binary128
+13 “D” Standard Extension for Double-Precision Floating-Point, Version 2.2
+Zicsr für Control and Status Registers (CSRs) (siehe unten)
+C für komprimierte Befehle, das sind 16-bit-Kodierungen häufig verwendeter Befehle, die somit den Speicherverbrauch reduzieren.
 
 See: https://github.com/martinKindall/compile-for-risc-v-gnu
 
@@ -1554,10 +1727,26 @@ int main() {
 }
 ```
 
+https://stackoverflow.com/questions/5244509/no-debugging-symbols-found-when-using-gdb
+For debug symbols: The application has to be both compiled and linked with -g option. I.e. you need to put -g in both CPPFLAGS and LDFLAGS.
 
 ```
-/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -r example.c -o example.o
-/opt/riscv/bin/riscv32-unknown-linux-gnu-ld -o example.elf -T linker_script.ld -m elf32lriscv -nostdlib --no-relax
+rm example.elf example.bin example.hex example.o
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -g -r example.c -o example.o
+/opt/riscv/bin/riscv32-unknown-linux-gnu-ld -g -o example.elf -T linker_script.ld -m elf32lriscv -nostdlib --no-relax
+```
+
+To make debug symbols work in gdb, use this:
+
+```
+cd ~/dev/openocd/riscv_openocd_jtag_mock/create_binary_example
+rm example.elf example.bin example.hex example.o a.out
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -g example.c -o example.elf
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32i -g example.c -o example.elf
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32i -mabi=ilp32 -g example.c -o example.elf
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32im -mabi=ilp32 -g example.c -o example.elf
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imd -g example.c -o example.elf
 ```
 
 Convert elf to bin using riscv32-unknown-linux-gnu-objcopy
@@ -1615,3 +1804,110 @@ data3 data3 data2 data2
 https://www.youtube.com/watch?v=GWiAQs4-UQ0
 
 sudo apt install gcc-riscv64-linux-gnu
+
+
+
+
+## GNU Debugger (gdb)
+
+Start gdb:
+
+```
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gdb /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+```
+
+Connect gdb to openocd:
+
+```
+target remote localhost:3333
+target extended-remote localhost:3333
+```
+
+Question registers
+
+```
+info registers
+```
+
+Stop gdb:
+
+```
+quit
+```
+
+```
+gdb /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+```
+
+## Architecture
+
+set arch riscv:rv32
+
+## OpenOCD
+
+target extended-remote localhost:3333
+
+## File:
+
+file <program to be debugged> - select the file to debug
+example:
+file /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+
+## Breakpoints:
+
+info breakpoints    - lists all current breakpoints
+break main          - set a breakpoint in the main function
+b main              - set a breakpoint in the main function
+b *0x00000000       - set a breakpoint at memory location 0x00000000
+
+## Single Stepping
+
+stepi
+
+## Executing
+
+run
+continue
+
+## ???
+
+ni
+
+
+
+bfd requires flen 8, but target has flen 0
+bfd requires flen 8, but target has flen 4
+
+%% This error goes away, when from the misa register, 
+%% the RISC-V CPU returns that it supports the F and D extensions.
+
+https://sourceware.org/pipermail/gdb-cvs/2019-January/044597.html
+
+if (abi_features.flen > features.flen)
+     error (_("bfd requires flen %d, but target has flen %d"),
+-           info_features.flen, features.flen);
+
+
+gdb uses the BFD subroutine library to examine multiple object-file formats; BFD was
+a joint project of David V. Henkel-Wallace, Rich Pixley, Steve Chamberlain, and John
+Gilmore.
+
+
+
+bfd requires flen 8, but target has flen 0
+bfd requires flen 8, but target has flen 4
+
+%% This error goes away, when from the misa register, 
+%% the RISC-V CPU returns that it supports the F and D extensions.
+
+https://github.com/riscv-software-src/riscv-isa-sim/issues/380
+
+For anyone else struggling with this error message (as I have for 2 days), note that regardless of the GCC options used to compile your code, the parameters used to build the toolchain may override the settings. When configuring the toolchain, use this for 4-byte (single precision) floats:
+
+./configure --prefix=/opt/riscv --with-arch=rv32if --with-abi=ilp32f
+
+or
+
+./configure --prefix=/opt/riscv --with-arch=rv32i --with-abi=ilp32
+
+for no hard floats, matching the target flen of zero.

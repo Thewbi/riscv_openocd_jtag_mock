@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string>
+#include <inttypes.h>
 
 #include "tap_state_machine.h"
 
