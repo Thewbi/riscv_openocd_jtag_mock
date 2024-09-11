@@ -115,10 +115,11 @@ void remote_bitbang_t::tick(
 {
     if (client_fd > 0)
     {
-        // should the client send the 'R' command, it wants to read the current value of the tdo variable
+        // should the client send the JTAG bitbang 'R' command, 
+        // then it wants to read the current value of the tdo variable
 
-        // Currently do not use the value that the driver (main()) program supplies since it currently is not
-        // connected to any functioning logic at all.
+        // Currently do not use the value that the driver (main()) 
+        // program supplies since it currently is not connected to any functioning logic at all.
         // tdo = jtag_tdo;
 
         execute_command();
@@ -490,8 +491,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             break;
 
         // Debug Specification, page 95, 6.1.5 Debug Module Interface Access (Register)
-        // Allows access to the Debug Module Interface (DMI) which terminates the debug (JTAG) connection
-        // and is connected to one or more Debug Modules (DM).
+        // Allows access to the Debug Module Interface (DMI) which is the endpoint of
+        // the debug (JTAG) connection and is connected to one or more Debug Modules (DM).
         // 
         case RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS:
 
@@ -523,10 +524,12 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             // AXI, AMBA, .... First the command to execute a read operation is sent to the DebugModuleInterface (DMI)
             // which then talks to the DebugModule (DM) over the bus to access a register.
 
-
             // 0x04 (Abstract Data 0 (data0))
-            if (dmi_address == 0x04) {
-
+            // 0x05 (Abstract Data 1 (data1))
+            // ...
+            // 0x0f (Abstract Data 11 (data11))
+            if ((dmi_address >= 0x04) && (dmi_address <= 0x0f)) {
+            
                 // data 0 through data 11 (Registers data 0 - data 11) are registers that may
                 // be read or changed by abstract commands. datacount indicates how many 
                 // of them are implemented, starting at data0 counting up. 
@@ -537,10 +540,12 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) \n");
                 // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
 
+                uint32_t idx = dmi_address - 0x04;
+
                 if (dmi_op == 0x01) {
 
-                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) READ \n");
-                    dmi_data = abstract_data_0;
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data %d (data%d) (0x%02x) READ. value = %ld\n", idx, idx, idx, abstract_data[dmi_address - 0x04]);
+                    dmi_data = abstract_data[idx];
 
                     // success, the operation 0x00 used in a response is interpreted by openocd
                     // as a successfull termination of the requested operation
@@ -552,191 +557,15 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         ((dmi_op & 0b11) << 0);
 
                 } else if (dmi_op == 0x02) {
-                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 0 (data0) (0x04) WRITE \n");
-                    abstract_data_0 = dmi_data;
+
+                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data %d (data%d) (0x%02x) WRITE \n", idx, idx, idx);
+                    abstract_data[dmi_address - 0x04] = dmi_data;
+
                 }
 
                 //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
 
-                
-            
-            } 
-            // 0x05 (Abstract Data 1 (data1))
-            else if (dmi_address == 0x05) {
-
-                // data 0 through data 11 (Registers data 0 - data 11) are registers that may
-                // be read or changed by abstract commands. datacount indicates how many 
-                // of them are implemented, starting at data0 counting up. 
-                //
-                // Table 2 shows how abstract commands use these registers.
-
-                // // aampostincrement
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 1 (data1) (0x05) WRITE \n");
-                // }
-
-                //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                abstract_data_1 = dmi_data;
-            
             }
-            // 0x06 (Abstract Data 2 (data2)) 
-            else if (dmi_address == 0x06) {
-
-                // // aampostincrement
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 2 (data2) (0x06) WRITE \n");
-                // }
-
-                //fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                abstract_data_2 = dmi_data;
-            }
-            // 0x07 (Abstract Data 3 (data3))
-            else if (dmi_address == 0x07) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 3 (data3) (0x07) WRITE \n");
-                // }
-
-                abstract_data_3 = dmi_data;
-            }
-
-            // 0x08 (Abstract Data 4 (data4))
-            else if (dmi_address == 0x08) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                if (dmi_op == 0x01) {
-                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) READ \n");
-                } else if (dmi_op == 0x02) {
-                    fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 4 (data4) (0x08) WRITE \n");
-                }
-
-                abstract_data_4 = dmi_data;
-            }
-
-            // 0x09 (Abstract Data 5 (data5))
-            else if (dmi_address == 0x09) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 5 (data5) (0x09) WRITE \n");
-                // }
-
-                abstract_data_5 = dmi_data;
-            }
-
-            // 0x0a (Abstract Data 6 (data6))
-            else if (dmi_address == 0x0a) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 6 (data6) (0x0a) WRITE \n");
-                // }
-
-                abstract_data_6 = dmi_data;
-            }
-
-            // 0x0b (Abstract Data 7 (data7))
-            else if (dmi_address == 0x0b) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 7 (data7) (0x0b) WRITE \n");
-                // }
-
-                abstract_data_7 = dmi_data;
-            }
-
-            // 0x0c (Abstract Data 8 (data8))
-            else if (dmi_address == 0x0c) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 8 (data8) (0x0c) WRITE \n");
-                // }
-
-                abstract_data_8 = dmi_data;
-            }
-
-            // 0x0d (Abstract Data 9 (data9))
-            else if (dmi_address == 0x0d) {
-                
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 9 (data9) (0x0d) WRITE \n");
-                // }
-
-                abstract_data_9 = dmi_data;
-            }
-
-            // 0x0e (Abstract Data 10 (data10))
-            else if (dmi_address == 0x0e) {
-                
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 10 (data10) (0x0e) WRITE \n");
-                // }
-
-                abstract_data_10 = dmi_data;
-            }
-
-            // 0x0f (Abstract Data 11 (data11))
-            else if (dmi_address == 0x0f) {
-
-                // fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) \n");
-                // fprintf(stderr, "\ndmi_data: %ld\n", dmi_data);
-
-                // if (dmi_op == 0x01) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) READ \n");
-                // } else if (dmi_op == 0x02) {
-                //     fprintf(stderr, "\n~~~~~~~~ DebugModule (DM) Abstract Data 11 (data11) (0x0f) WRITE \n");
-                // }
-
-                abstract_data_11 = dmi_data;
-            }
-
             // 0x10 == DebugModule Control Register (DebugSpec, Page 26 and Page 30)
             else if (dmi_address == 0x10) {
                 
@@ -1131,8 +960,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         // read operation
                         fprintf(stderr, "read CSR_MISA (0x301)\n");
 
-                        //                  MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
-                        abstract_data_0 = 0b01000000000000000000000100101000;
+                        //                   MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
+                        abstract_data[0] = 0b01000000000000000000000100101000;
         
                     }
 
@@ -1149,8 +978,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                     // Writes to this register cause the corresponding abstract command to be executed.
                     //
-                    // Writing this register while an abstract command is executing causes cmderr to become 1 (busy) once
-                    // the command completes (busy becomes 0).
+                    // Writing this register while an abstract command is executing causes cmderr to 
+                    // become 1 (busy) once the command completes (busy becomes 0).
                     //
                     // If cmderr is non-zero, writes to this register are ignored.
                     //
@@ -1163,8 +992,10 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                     //cmderr = 0x01;
                     cmderr = 0x00;
 
+                    // DEBUG
                     //fprintf(stderr, "\ncmdtype: %d, control: %d\n", cmdtype, control);
 
+                    // determine which type of abstract command is executed
                     if (cmdtype == 0x00) {
 
                         // 3.7.1.1. Access Register, page 18
@@ -1177,11 +1008,67 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         uint32_t aarpostincrement = (control >> 19) & 0x01;
                         uint32_t aarsize = (control >> 20) & 0b111;
 
+
+                        // Check if the request has specified the correct register size XLEN.
+                        // If the sent XLEN does not match the real XLEN, the debug interface has
+                        // to set cmderr to 0x02
+                        //
+                        // perform "separate non-standard mechanism" to determine XLEN (register size)
+                        if (aarsize == 2) {
+                            // 32 bit
+                        } else if (aarsize == 3) {
+                            // 64 bit
+
+                            // output error, this system is 32 bit
+
+                            // if any of these operations fail, cmderr is set 
+                            // and none of the remaining steps are executed.
+
+                            // if a command has unsupported options set or if bits that are
+                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                            cmderr = 0x02;
+
+                            // // set a value into the dmi_container_register
+                            // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                            //     ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
+                            //     ((dmi_op & 0b11) << 0);
+
+                        } else if (aarsize == 4) {
+                            // 128 bit
+
+                            // output error, this system is 32 bit
+
+                            // if any of these operations fail, cmderr is set 
+                            // and none of the remaining steps are executed.
+
+                            // if a command has unsupported options set or if bits that are
+                            // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
+                            cmderr = 0x02;
+                        }
+
+
+
                         fprintf(stderr, "\nACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
-                        // CSR_MISA register
-                        if (regno == 0x301) {
+                        
+                        if (regno == 0x300) {
 
+                            // CSR_MSTATUS register - Zicsr extension
+                            //
+                            // https://book.rvemu.app/hardware-components/03-csrs.html
+                            //
+                            // The status registers, mstatus for M-mode and sstatus for S-mode, 
+                            // keep track of and control the CPU's current operating status.
+                            //
+                            // mstatus is allocated at 0x300 and sstatus is allocated at 0x100. 
+                            // It means we can access status registers by 0x300 and 0x100.
+
+                        } else if (regno == 0x301) {
+
+                            // CSR_MISA register - Zicsr extension
+                            //
+                            // https://book.rvemu.app/hardware-components/03-csrs.html
+                            //
                             // Register 0x17 is first written to start an abstract command to read a register for example.
                             // Register 0x16 is then polled to see if the command has terminated
                             //
@@ -1191,8 +1078,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             if (write == 0) {
                                 fprintf(stderr, "read CSR_MISA (0x301)\n");
 
-                                //                  MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
-                                abstract_data_0 = 0b01000000000000000000000100101000;
+                                //                   MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
+                                abstract_data[0] = 0b01000000000000000000000100101000;
 
                             } else  if(write == 1) {
                                  fprintf(stderr, "write CSR_MISA (0x301)\n");
@@ -1200,39 +1087,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             
                         } else {
 
-                            // perform "separate non-standard mechanism" to determine XLEN (register size)
-
-                            if (aarsize == 2) {
-                                // 32 bit
-                            } else if (aarsize == 3) {
-                                // 64 bit
-
-                                // output error, this system is 32 bit
-
-                                // if any of these operations fail, cmderr is set 
-                                // and none of the remaining steps are executed.
-
-                                // if a command has unsupported options set or if bits that are
-                                // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
-                                cmderr = 0x02;
-
-                                // // set a value into the dmi_container_register
-                                // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
-                                //     ((abstractcs_container_register & 0xFFFFFFFF) << 2) | 
-                                //     ((dmi_op & 0b11) << 0);
-
-                            } else if (aarsize == 4) {
-                                // 128 bit
-
-                                // output error, this system is 32 bit
-
-                                // if any of these operations fail, cmderr is set 
-                                // and none of the remaining steps are executed.
-
-                                // if a command has unsupported options set or if bits that are
-                                // defined as zero are not 0, then the DM must set cmderr to 2 (not supported)
-                                cmderr = 0x02;
-                            }
+                            fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
                         }
 
@@ -1278,33 +1133,46 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         if (write) {
 
                             if (aamsize == 2) {
-                                arg0 = abstract_data_0;
-                                arg1 = abstract_data_1;
 
-                                // arg0 = abstract_data_1 << 32 | abstract_data_0;
-                                // arg1 = abstract_data_3 << 32 | abstract_data_2;
-                            }
+                                arg0 = abstract_data[0];
+                                arg1 = abstract_data[1];
 
-                            if (aamsize == 3) {
-                                arg0 = abstract_data_0 << 32 | abstract_data_1;
-                                arg1 = abstract_data_2 << 32 | abstract_data_3;
+                            } else if (aamsize == 3) {
+
+                                arg0 = abstract_data[0] << 32 | abstract_data[1];
+                                arg1 = abstract_data[2] << 32 | abstract_data[3];
+
                             }
 
                             fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ WRITE 0x%08lx -> 0x%08lx \n", arg0, arg1);
+
                         } else {
+
                             fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ READ \n");
+
                         }
 
-                        // if (aampostincrement) {
-                        //     uint64_t increment = (2^(aamsize+3));
-                        //     abstract_data_2 += increment;
-                        //     abstract_data_3 += increment;
-                        // }
+                        // if aampostincrement is set, increment arg1
+                        // arg1 for 32bit is: the data 1 register (0x05)
+                        if (aampostincrement) {
 
-                        // // set a value into the dmi_container_register
-                        // dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
-                        //     ((debug_module_status & 0xFFFFFFFF) << 2) | 
-                        //     ((dmi_op & 0b11) << 0);
+                            // to implement correct auto-increment, write the next
+                            // (incremented) address to dmi_data and from dmi_data
+                            // into abstract_data[1]
+                            dmi_data = arg1; 
+                            dmi_data += (2 << (aamsize-1));
+
+                        }
+
+                        // to implement correct auto-increment (aampostincrement), write the next
+                        // (incremented) address to dmi_data and from dmi_data
+                        // into abstract_data[1]
+                        //
+                        // abstract_data[1] is then return when data1 (abstract_data[1])
+                        // is read. When the external debugger retrieves an incremented
+                        // address, it knows that the auto-increment (aampostincrement) feature
+                        // is implemented
+                        abstract_data[1] = dmi_data;
                         
                     }
 
@@ -1372,6 +1240,7 @@ void remote_bitbang_t::execute_command()
             fprintf(stderr, "No command received\n");
             again = 1;
 
+            fprintf(stderr, "sleep 1000\n");
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         else
@@ -1924,13 +1793,13 @@ std::string remote_bitbang_t::riscv_register_as_string(uint32_t register_index) 
 
         // Privileged Machine CSR addresses.
         // #define CSR_MSTATUS 0x300
-        case 0x0300: return "CSR_MSTATUS 0x0300";
+        case 0x0300: return "CSR_MSTATUS 0x0300 (Machine Mode Status Register, ZICSR extension)";
 
         // Privileged Machine CSR addresses.
         // #define CSR_MISA 0x301
         //
         // Found in riscv-gdb source code: gdb/include/opcode/riscv-opc.h
-        case 0x0301: return "CSR_MISA 0x301 - Machine ISA register (misa)";
+        case 0x0301: return "CSR_MISA 0x301 - Machine ISA register (misa) (Machine Mode Status Register, ZICSR extension)";
 
         // https://drive.google.com/file/d/1joBC2hWGEHJL4tFabjcqMpRqQNkqJ5WR/view
         // RISC-V Advanced Interrupt Architecture V1.0

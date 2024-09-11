@@ -574,7 +574,7 @@ Bit   Character Description
 4     E RV32E base ISA
 5     F Single-precision floating-point extension
 6     G Additional standard extensions present (IMAFD)
-7     H Reserved
+7     H Reserved (H - Hypervisor, also Virtualisierung)
 8     I RV32I/64I/128I base ISA
 9     J Tentatively reserved for Dynamically Translated Languages extension
 10    K Reserved
@@ -593,6 +593,12 @@ Bit   Character Description
 23    X Non-standard extensions present
 24    Y Reserved
 25    Z Reserved
+
+https://wiki.riscv.org/display/HOME/Ratified+Extensions
+
+Zicsr - Control & Status Register Zugriff
+Zifencei - Synchronisation von Lese/Schreibzugriffen auf Befehlsspeicher
+Zbb, Zbc - Bitmanipulation
 
 If the misa register is not implemented (CPU returns 0x00), then the external debugger
 has to use a "separate non-standard mechanism". (see https://riscv.org/wp-content/uploads/2017/05/riscv-privileged-v1.10.pdf)
@@ -724,7 +730,7 @@ halt [ms]
 wait_halt [ms]
 resume [address]
 
-step [address]
+step [address] // addresse is optional, it is possible to just enter step
 example:
 step 0x00
 
@@ -1754,7 +1760,7 @@ Convert elf to bin using riscv32-unknown-linux-gnu-objcopy
 /opt/riscv/bin/riscv32-unknown-linux-gnu-objcopy -O binary example.elf example.bin
 ```
 
-Convert elf to ihex using riscv32-unknown-linux-gnu-objcopy
+Convert elf to ihex using riscv32-unknown-linux-gnu-objcopy (this is a valid ihex format file!)
 ```
 /opt/riscv/bin/riscv32-unknown-linux-gnu-objcopy -O ihex example.elf example.hex
 ```
@@ -1784,6 +1790,13 @@ write_memory 0x01 32 0x22
 ```
 riscv info
 ```
+
+Error: 
+```
+Warn : [riscv.cpu0] Buggy aampostincrement! Address not incremented correctly.
+```
+The solution is to increment arg1 as the specification says.
+
 
 
 openocd log output is
