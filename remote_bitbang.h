@@ -8,6 +8,11 @@
 #include <string>
 #include <inttypes.h>
 
+#include <iostream>
+#include <iomanip>
+#include <ctime>
+#include <sstream>
+
 #include "tap_state_machine.h"
 
 // // instructions / register indexes

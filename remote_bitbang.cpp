@@ -572,10 +572,12 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // read operation
                 if ((dmi_address == 0x10) && (dmi_op == 0x01)) {
 
+                    fprintf(stderr, "\nDebugModule Control Register READ\n");
+
                     // construct the response
                     uint64_t debug_module_control = 
-                        (haltreq << 31) |
-                        (resumereq << 30) |
+                        (haltreq << 31) |           // Writing 0 clears the halt request bit for all currently selected harts.
+                        (resumereq << 30) |         // Writing 1 causes the currently selected harts to resume once, if they are halted when the write occurs. 
                         (hartreset << 29) |
                         (ackhavereset << 28) |
                         (ackunavail << 27) |
@@ -605,11 +607,15 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 }  
                 // write operation
                 else if ((dmi_address == 0x10) && (dmi_op == 0x02)) {
+
+                    fprintf(stderr, "\nDebugModule Control Register WRITE\n");
+
+                    // https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf
                     
                     // parse the incoming fields
-                    haltreq = ((dmi_data >> 31) & 0b1);
-                    resumereq = ((dmi_data >> 30) & 0b1);
-                    hartreset = ((dmi_data >> 29) & 0b1);
+                    haltreq = ((dmi_data >> 31) & 0b1);             // Writing 0 clears the halt request bit for all currently selected harts.
+                    resumereq = ((dmi_data >> 30) & 0b1);           // Writing 1 causes the currently selected harts to resume once, if they are halted when the write occurs. 
+                    hartreset = ((dmi_data >> 29) & 0b1);           // This optional field writes the reset bit for all the currently selected harts. To perform a reset the debugger writes 1, and then writes 0 to deassert the reset signal.
                     ackhavereset = ((dmi_data >> 28) & 0b1);
                     ackunavail = ((dmi_data >> 27) & 0b1);
                     hasel = ((dmi_data >> 26) & 0b1);
@@ -620,7 +626,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                     setresethaltreq = ((dmi_data >> 3) & 0b1);
                     clrresethaltreq = ((dmi_data >> 2) & 0b1);
                     ndmreset = ((dmi_data >> 1) & 0b1);
-                    dmactive = ((dmi_data >> 0) & 0b1);
+                    dmactive = ((dmi_data >> 0) & 0b1);             // This bit serves as a reset signal for the Debug Module itself. 0 triggers a reset. 1 causes the module to remain as is without reset.
 
                     fprintf(stderr, "\n");
                     fprintf(stderr, "haltreq: %d\n", haltreq);
@@ -638,10 +644,25 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                     fprintf(stderr, "ndmreset: %d\n", ndmreset);
                     fprintf(stderr, "dmactive: %d\n", dmactive);
 
+                    // single step requested
+                    if (resumereq == 1) {
+
+                        auto t = std::time(nullptr);
+                        auto tm = *std::localtime(&t);
+
+                        std::ostringstream oss;
+                        oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+                        auto str = oss.str();
+
+                        std::cout << str << std::endl;
+
+                        fprintf(stderr, "\n %s [SINGLE_STEP] Selected harts perform single step requested!\n", str.c_str());
+                    }
+
                     // dm restart requested by writing a 1 into the dmactive bit of the dmcontrol register
                     if (hasel == 0 && dmactive == 1) {
 
-                        fprintf(stderr, "\nDM restart requested!\n");
+                        fprintf(stderr, "\nDM activate or remain active (not reset) requested!\n");
 
                         // simulated restart - seen openocd source code. riscv-013.c, line 1839, "Activating the DM."
                         // openocd writes a 1 into the DM's dmactive bit to tell the DM to activate.
@@ -752,7 +773,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 }
 
             } 
-            // 0x11 == DebugModule Status (DebugSpec, Page 28) - 3.14.1 Debug Module Status
+            // 0x11 == DebugModule Status (dmstatus) (DebugSpec, Page 28) - 3.14.1 Debug Module Status
             else if (dmi_address == 0x11) {
 
 #ifdef OPENOCD_POLLING_DEBUG // openocd keeps polling the target every 400ms which results in massive spam
@@ -771,7 +792,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 uint32_t impebreak = 0x00;
                 uint32_t allhavereset = 0x00;
                 uint32_t anyhavereset = 0x00;
-                uint32_t allresumeack = 0x00;
+                uint32_t allresumeack = 0x01; // this is checked when performing a single step by openocd (step) command
                 uint32_t anyresumeack = 0x00;
                 uint32_t allnonexistent = 0x00;
                 uint32_t anynonexistent = 0x00;
@@ -928,14 +949,16 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
             // 3.14.7. Abstract Command (command, at 0x17)
             else if (dmi_address == 0x17) {
 
+                // file:///home/wbi/Downloads/riscv-debug-specification.pdf
+
                 // Register 0x17 is first written to start an abstract command to read a register for example.
                 // Register 0x16 is then polled to see if the command has terminated
                 // the resulting value is then read from register 0x04 for 32 bit and from
                 // register 0x04 and 0x05 for 64 bit.
 
                 // cmdtype: 0, control: 3280904
-                uint32_t cmdtype = ((dmi_data >> 24) & 0xFF);
-                uint32_t control = ((dmi_data >> 0) & 0xFFFFFF);
+                uint64_t cmdtype = ((dmi_data >> 24) & 0xFF);
+                uint64_t control = ((dmi_data >> 0) & 0xFFFFFF);
 
                 // read operation
                 if (dmi_op == 0x01) {
@@ -957,19 +980,28 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         // the resulting value is then read from register 0x04 for 32 bit and from
                         // register 0x04 and 0x05 for 64 bit.
 
+                        // The misa CSR is a WARL read-write register reporting the ISA supported by the hart. 
+                        // This register must be readable in any implementation, but a value of zero can be 
+                        // returned to indicate the misa register has not been implemented, requiring that CPU 
+                        // capabilities be determined through a separate non-standard mechanism.
+
                         // read operation
                         fprintf(stderr, "read CSR_MISA (0x301)\n");
 
                         //                   MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
                         abstract_data[0] = 0b01000000000000000000000100101000;
         
+                    } else {
+
+                        fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND read regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
+
                     }
 
                     // The type determines the overall functionality of this abstract command.
-                    uint32_t cmdtype = 0x00;
+                    //uint32_t cmdtype = 0x00;
 
                     // This field is interpreted in a command-specific manner, described for each abstract command.
-                    uint32_t control = 0x00;
+                    //uint32_t control = 0x00;
 
                 // write operation
                 } else if (dmi_op == 0x02) {
@@ -1008,7 +1040,6 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         uint32_t aarpostincrement = (control >> 19) & 0x01;
                         uint32_t aarsize = (control >> 20) & 0b111;
 
-
                         // Check if the request has specified the correct register size XLEN.
                         // If the sent XLEN does not match the real XLEN, the debug interface has
                         // to set cmderr to 0x02
@@ -1046,11 +1077,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             cmderr = 0x02;
                         }
 
-
-
                         fprintf(stderr, "\nACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
-                        
                         if (regno == 0x300) {
 
                             // CSR_MSTATUS register - Zicsr extension
@@ -1063,11 +1091,43 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             // mstatus is allocated at 0x300 and sstatus is allocated at 0x100. 
                             // It means we can access status registers by 0x300 and 0x100.
 
+                            // 3.1.6 Machine Status Registers (mstatus and mstatush)
+                            // The mstatus register is an MXLEN-bit read/write register formatted as 
+                            //shown in Figure 1.6 for RV32 and Figure 1.7 for RV64. The mstatus register 
+                            // keeps track of and controls the hart’s current operating state.
+                            //
+                            // A restricted view of mstatus appears as the sstatus register in the S-level ISA.
+
+                            // https://five-embeddev.com/quickref/csrs.html
+
+                            // [31]     SD          - Extension Context - Read-only bit that summarizes whether either the FS, VS or XS fields signal the presence of some dirty state that will require saving extended user context to memory.
+                            // [30-23]  WPRI        - Reserved - Writes Preserve Values, Reads Ignore Values (WPRI)
+                            // [22]     TSR         - The TSR (Trap SRET) bit is a WARL field that supports intercepting the supervisor exception return instruction, SRET.
+                            // [21]     TW          - The TW (Timeout Wait) bit is a WARL field that supports intercepting the WFI instruction.
+                            // [20]     TVM         - The TVM (Trap Virtual Memory) bit is a WARL field that supports intercepting supervisor virtual-memory management operations.
+                            // [19]     MXR         - The MXR (Make eXecutable Readable) bit modifies the privilege with which loads access virtual memory. 0 - Only loads from pages marked readable will succeed. 1 - Loads from pages marked either readable or executable will succeed.
+                            // [18]     SUM         - The SUM (permit Supervisor User Memory access) bit modifies the privilege with which S-mode loads and stores access virtual memory. 0 - S-mode memory accesses to pages that are accessible by U-mode will fault. 1. - S-mode memory accesses to pages that are accessible by U-mode are permitted.
+                            // [17]     MPRV        - Modify Privilege
+                            // [16-15]  XS[1:0]     - The XS field encodes the status of additional user-mode extensions and associated state.
+                            // [14-13]  FS[1:0]     - The FS field encodes the status of the floating-point unit state, including the floating-point registers f0–f31 and the CSRs fcsr, frm, and fflags.
+                            // [12-11]  MPP[1:0]    - Machine Previous Privilege mode. Two-level stack
+                            // [10-9]   VS[1:0]     - The VS field encodes the status of the vector extension state, including the vector registers v0–v31 and the CSRs vcsr, vxrm, vxsat, vstart, vl, vtype, and vlenb.
+                            // [8]      SPP         - Supervisor Previous Privilege mode
+                            // [7]      MPIE        - Machine Prior Interrupt Enable
+                            // [6]      UBE         - Endianness Control - Control the endianness of memory accesses made from S-mode other than instruction fetches. (Instruction fetches are always little-endian). 0 - Little Endian. 1 - Big Endian.
+                            // [5]      SPIE        - Supervisor Prior Interrupt Enable
+                            // [4]      WPRI        - Reserved - Writes Preserve Values, Reads Ignore Values (WPRI)
+                            // [3]      MIE         - Machine Interrupt Enable - Global Interupt Enable (in M-Mode) (M-Mode = Machine Mode = application has full access)
+                            // [2]      WPRI        - Reserved - Writes Preserve Values, Reads Ignore Values (WPRI)
+                            // [1]      SIE         - Supervisor Interrupt Enable - Global Interupt Enable (in S-Mode) (S-Mode = Supervisor Mode = application has limited access)
+                            // [0]      WPRI        - Reserved - Writes Preserve Values, Reads Ignore Values (WPRI)
+
                         } else if (regno == 0x301) {
 
                             // CSR_MISA register - Zicsr extension
                             //
                             // https://book.rvemu.app/hardware-components/03-csrs.html
+                            // https://five-embeddev.com/riscv-priv-isa-manual/Priv-v1.12/machine.html
                             //
                             // Register 0x17 is first written to start an abstract command to read a register for example.
                             // Register 0x16 is then polled to see if the command has terminated
@@ -1076,21 +1136,161 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                             // and from register 0 (0x04) and 1 (0x05) for 64 bit.
 
                             if (write == 0) {
+
                                 fprintf(stderr, "read CSR_MISA (0x301)\n");
 
                                 //                   MXL   ZYXWVUTSRQPONMLKJIHGFEDCBA
                                 abstract_data[0] = 0b01000000000000000000000100101000;
 
-                            } else  if(write == 1) {
-                                 fprintf(stderr, "write CSR_MISA (0x301)\n");
+                            } else if (write == 1) {
+
+                                fprintf(stderr, "write CSR_MISA (0x301)\n");
                             }
             
+                        } else if (regno == 0x07b0) {
+
+                            // 4.8.1 Debug Control and Status (dcsr, at 0x7b0)
+
+                            // xdebugver [31-28]    0: There is no external debug support. 
+                            //                      4: External debug support exists as it is described in this document. 
+                            //                      15: There is external debug support, but it does not conform to any available version of this spec.
+                            // 0         [27-16]
+                            // ebreakm   [15]       0: ebreak instructions in M-mode behave as described in the Privileged Spec. 
+                            //                      1: ebreak instructions in M-mode enter Debug Mode.
+                            // 0         [14]
+                            // ebreaks   [13]       0: ebreak instructions in S-mode behave as described in the Privileged Spec.
+                            //                      1: ebreak instructions in S-mode enter Debug Mode.
+                            // ebreaku   [12]       0: ebreak instructions in U-mode behave as described in the Privileged Spec.
+                            //                      1: ebreak instructions in U-mode enter Debug Mode.
+                            // stepie    [11]       0: Interrupts are disabled during single stepping.
+                            //                      1: Interrupts are enabled during single stepping.
+                            //                      Implementations may hard wire this bit to 0. In
+                            //                      that case interrupt behavior can be emulated by
+                            //                      the debugger.
+                            //                      The debugger must not change the value of this
+                            //                      bit while the hart is running.
+                            // stopcount [10]       0: Increment counters as usual.
+                            //                      1: Don’t increment any counters while in Debug
+                            //                      Mode or on ebreak instructions that cause entry into Debug Mode.
+                            //                      These counters include the cycle and instret CSRs.
+                            //                      This is preferred for most debugging scenarios.
+                            //                      An implementation may hardwire this bit to 0 or 1.
+                            //                      Stop Counters.
+                            // stoptime  [9]        0: Increment timers as usual.
+                            //                      1: Don’t increment any hart-local timers while in Debug Mode.
+                            //                      An implementation may hardwire this bit to 0 or 1.
+                            //                      Stop timers.
+                            // cause     [8-6]      Explains why Debug Mode was entered.
+                            //                      When there are multiple reasons to enter Debug
+                            //                      Mode in a single cycle, hardware should set cause
+                            //                      to the cause with the highest priority.
+                            //                      1: An ebreak instruction was executed. (priority 3)
+                            //                      2: The Trigger Module caused a breakpoint exception. (priority 4, highest)
+                            //                      3: The debugger requested entry to Debug Mode using haltreq. (priority 1)
+                            //                      4: The hart single stepped because step was set. (priority 0, lowest)
+                            //                      5: The hart halted directly out of reset due to resethaltreq. It is also acceptable to report 3 when
+                            //                      this happens. (priority 2) 
+                            //                      Other values are reserved for future use.
+                            // 0         [5]  
+                            // mprven    [4]        0: MPRV in mstatus is ignored in Debug Mode.
+                            //                      1: MPRV in mstatus takes effect in Debug Mode.
+                            //                      Implementing this bit is optional. It may be tied to either 0 or 1.
+                            // nmip      [3]        When set, there is a Non-Maskable-Interrupt
+                            //                      (NMI) pending for the hart.
+                            //                      Since an NMI can indicate a hardware error condition, reliable debugging may no longer be possible
+                            //                      once this bit becomes set. This is implementationdependent.
+                            // step      [2]        When set and not in Debug Mode, the hart will only execute a single instruction and then enter Debug Mode. 
+                            //                      If the instruction does not complete due to an exception, the hart will immediately enter Debug Mode before executing the trap
+                            //                      handler, with appropriate exception registers set.
+                            //                      The debugger must not change the value of this
+                            //                      bit while the hart is running.
+                            // prv       [1-0]      Contains the privilege level the hart was operating
+                            //                      in when Debug Mode was entered. The encoding
+                            //                      is described in Table 4.5. A debugger can change
+                            //                      this value to change the hart’s privilege level when
+                            //                      exiting Debug Mode.
+                            //                      Not all privilege levels are supported on all harts.
+                            //                      If the encoding written is not supported or the
+                            //                      debugger is not allowed to change to it, the hart
+                            //                      may change to any supported privilege level.
+
+                            if (write == 0) {
+
+                                fprintf(stderr, "read dcsr (0x07b0)\n");
+
+                                uint32_t xdebugver = (control >> 28) & 0b1111;
+                                uint32_t ebreakm = (control >> 15) & 0b1;
+                                uint32_t ebreaks = (control >> 13) & 0b1;
+                                uint32_t ebreaku = (control >> 12) & 0b1;
+                                uint32_t stepie = (control >> 11) & 0b1;
+                                uint32_t stopcount = (control >> 10) & 0b1;
+                                uint32_t stoptime = (control >> 9) & 0b1;
+                                uint32_t cause = (control >> 6) & 0b111;
+                                uint32_t mprven = (control >> 4) & 0b1;
+                                uint32_t nmip = (control >> 3) & 0b1;
+                                uint32_t step = (control >> 2) & 0b1;
+                                uint32_t prv = (control >> 0) & 0b11;
+
+                                fprintf(stderr, "write dcsr (0x07b0) xdebugver: %d\n", xdebugver);
+                                fprintf(stderr, "write dcsr (0x07b0) ebreakm: %d\n", ebreakm);
+                                fprintf(stderr, "write dcsr (0x07b0) ebreaks: %d\n", ebreaks);
+                                fprintf(stderr, "write dcsr (0x07b0) ebreaku: %d\n", ebreaku);
+                                fprintf(stderr, "write dcsr (0x07b0) stepie: %d\n", stepie);
+                                fprintf(stderr, "write dcsr (0x07b0) stopcount: %d\n", stopcount);
+                                fprintf(stderr, "write dcsr (0x07b0) stoptime: %d\n", stoptime);
+                                fprintf(stderr, "write dcsr (0x07b0) cause: %d\n", cause);
+                                fprintf(stderr, "write dcsr (0x07b0) mprven: %d\n", mprven);
+                                fprintf(stderr, "write dcsr (0x07b0) nmip: %d\n", nmip);
+                                fprintf(stderr, "write dcsr (0x07b0) step: %d\n", step);
+                                fprintf(stderr, "write dcsr (0x07b0) prv: %d\n", prv);
+
+                            } else if (write == 1) {
+
+                                fprintf(stderr, "write dcsr (0x07b0)\n");
+
+                                uint32_t xdebugver = 0x04;
+                                uint32_t ebreakm = 0x01;
+                                uint32_t ebreaks = 0x01;
+                                uint32_t ebreaku = 0x01;
+                                uint32_t stepie = 0x00;
+                                uint32_t stopcount = 0x01;
+                                uint32_t stoptime = 0x00;
+                                uint32_t cause = 0x00;
+                                uint32_t mprven = 0x00;
+                                uint32_t nmip = 0x00;
+                                uint32_t step = 0x00;
+                                uint32_t prv = 0x00;
+                            }
+
+                        } else if (regno == 0x07b1) {
+
+                            // 4.8.2 Debug PC (dpc, at 0x7b1)
+                            //
+                            // Upon entry to debug mode, dpc is updated with the virtual address of 
+                            // the next instruction to be executed. The behavior is described in more detail in Table 4.3.
+                            //
+                            // When resuming, the hart’s PC is updated to the virtual address stored in dpc. 
+                            // A debugger may write dpc to change where the hart resumes.
+
+                            if (write == 0) {
+
+                                fprintf(stderr, "read dpc (0x07b1)\n");
+
+                                abstract_data[0] = 0x00;
+
+                            } else if (write == 1) {
+
+                                fprintf(stderr, "write dpc (0x07b1)\n");
+
+                                fprintf(stderr, "write dpc (0x07b1) written control: 0x%08lx\n", control);
+
+                            }
+                        
                         } else {
 
-                            fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
+                            fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND write regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
                         }
-
                         
                     } else if (cmdtype == 0x01) {
 

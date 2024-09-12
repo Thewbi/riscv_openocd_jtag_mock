@@ -595,8 +595,10 @@ Bit   Character Description
 25    Z Reserved
 
 https://wiki.riscv.org/display/HOME/Ratified+Extensions
+https://riscv.org/wp-content/uploads/2019/12/riscv-spec-20191213.pdf
+https://five-embeddev.com/riscv-priv-isa-manual/Priv-v1.12/machine.html
 
-Zicsr - Control & Status Register Zugriff
+Zicsr - Control & Status Register Zugriff (Chapter 9 “Zicsr”, Control and Status Register (CSR) Instructions, Version 2.0. Page 55)
 Zifencei - Synchronisation von Lese/Schreibzugriffen auf Befehlsspeicher
 Zbb, Zbc - Bitmanipulation
 
@@ -723,6 +725,9 @@ telnet localhost 4444
 help
 ```
 
+```
+load_image create_binary_example/example.hex 0x00000000 ihex
+```
 
 ```
 sleep msec [busy]
@@ -730,7 +735,7 @@ halt [ms]
 wait_halt [ms]
 resume [address]
 
-step [address] // addresse is optional, it is possible to just enter step
+step [address] // address is optional, it is possible to just enter step
 example:
 step 0x00
 
@@ -756,6 +761,8 @@ mwb [phys] addr byte [count]
 
 dump_image filename address size
 load_image filename address [[bin|ihex|elf|s19] min_addr max_length]
+example:
+load_image create_binary_example/example.hex 0x00000000 ihe
 
 # With no parameters, lists all active breakpoints. 
 # Else sets a breakpoint on code execution starting at address for length bytes. 
