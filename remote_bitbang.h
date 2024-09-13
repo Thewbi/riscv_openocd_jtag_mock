@@ -292,6 +292,42 @@ private:
     uint64_t arg1 = 0x00;
     uint64_t arg2 = 0x00;
 
+    uint64_t dpc = 0x00;
+
+    //  case 0, 0x00: return "zero";
+    //  case 1, 0x01: return "ra";
+    //  case 2, 0x02: return "sp";
+    //  case 3, 0x03: return "gp";
+    //  case 4, 0x04: return "tp";
+    //  case 5, 0x05: return "t0";
+    //  case 6, 0x06: return "t1";
+    //  case 7, 0x07: return "t2";
+    //  case 8, 0x08: return "s0/fp";
+    //  case 9, 0x09: return "s1";
+    // case 10, 0x0A: return "a0";
+    // case 11, 0x0B: return "a1";
+    // case 12, 0x0C: return "a2";
+    // case 13, 0x0D: return "a3";
+    // case 14, 0x0E: return "a4";
+    // case 15, 0x0F: return "a5";
+    // case 16, 0x10: return "a6";
+    // case 17, 0x11: return "a7";
+    // case 18, 0x12: return "s2";
+    // case 19, 0x13: return "s3";
+    // case 20, 0x14: return "s4";
+    // case 21, 0x15: return "s5";
+    // case 22, 0x16: return "s6";
+    // case 23, 0x17: return "s7";
+    // case 24, 0x18: return "s8";
+    // case 25, 0x19: return "s9";
+    // case 26, 0x1A: return "s10";
+    // case 27, 0x1B: return "s11";
+    // case 28, 0x1C: return "t3";
+    // case 29, 0x1D: return "t4";
+    // case 30, 0x1E: return "t5";
+    // case 31, 0x1F: return "t6";
+    uint32_t register_file[32]{0};
+
 };
 
 #endif

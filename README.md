@@ -142,7 +142,7 @@ server on localhost:3335 since this server does not exist yet!
 # Create the server (= mocked target)
 
 ```
-g++ remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_machine_callback.cpp -g
+g++ -g remote_bitbang_main.cpp remote_bitbang.cpp tap_state_machine.cpp tap_state_machine_callback.cpp 
 
 clear & ./a.out
 
@@ -1754,12 +1754,28 @@ To make debug symbols work in gdb, use this:
 ```
 cd ~/dev/openocd/riscv_openocd_jtag_mock/create_binary_example
 rm example.elf example.bin example.hex example.o a.out
-/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -g example.c -o example.elf
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -fverbose-asm -g example.c -o example.elf
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -v -march=rv32id -mabi=ilp32 -nostartfiles -x c -Ttext 40000000 -Tdata 50000000 -Tbss 60000000 -o example.o example.c
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -v -march=rv32id -nostartfiles -x c -Ttext 40000000 -Tdata 50000000 -Tbss 60000000 -o example.elf example.c
+
+Inspect the .elf file: 
+/opt/riscv/bin/riscv32-unknown-linux-gnu-objdump -s -j .text /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+
 /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32i -g example.c -o example.elf
 
 /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32i -mabi=ilp32 -g example.c -o example.elf
 /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32im -mabi=ilp32 -g example.c -o example.elf
 /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imd -g example.c -o example.elf
+```
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -E -fdirectives-only -o MySrc.lst example.c
+
+This works: Create a assembly listing (see https://www.systutorials.com/generate-a-mixed-source-and-assembly-listing-using-gcc/)
+```
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -Wa,-adhln -g example.c > assembly_list.s
 ```
 
 Convert elf to bin using riscv32-unknown-linux-gnu-objcopy
@@ -1782,11 +1798,16 @@ Convert elf to hex using riscv32-unknown-elf-elf2hex (might not be available wit
 riscv32-unknown-elf-elf2hex --bit-width 32 --input example.elf --output example.hex
 ```
 
-Load hex file with openocd into the target.
+upload / Load hex file with openocd into the target.
+The <offset> can be used to load all the hex file sections to their original addresses plus the offset value.
+To just use the original addresses, specify an offset of 0x00000000.
+The original addresses are either specified by parameters to gcc or by using a linker and a linker-script
+which defines which section to place where.
+
 ```
+load_image <path_to_ihex_file> <offset> <format>
 load_image create_binary_example/example.hex 0x00000000 ihex
 ```
-
 
 Write a single memory cell
 ```
@@ -1828,6 +1849,15 @@ sudo apt install gcc-riscv64-linux-gnu
 
 
 
+
+## How to display a .elf file
+
+/opt/riscv/bin/riscv32-unknown-linux-gnu-readelf -a /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+
+objdump -s -j .text /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+objdump -s -j .rodata /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+
+
 ## GNU Debugger (gdb)
 
 Start gdb:
@@ -1843,7 +1873,7 @@ target remote localhost:3333
 target extended-remote localhost:3333
 ```
 
-Question registers
+Query registers
 
 ```
 info registers
@@ -1889,9 +1919,15 @@ stepi
 run
 continue
 
-## ???
+## ni (next instruction)
 
 ni
+
+## Show SourceCode
+
+list
+
+## Show disassembled source code
 
 
 

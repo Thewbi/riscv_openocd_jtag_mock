@@ -26,17 +26,14 @@ remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd == -1)
     {
-        fprintf(stderr, "remote_bitbang failed to make socket: %s (%d)\n",
-                strerror(errno), errno);
+        fprintf(stderr, "remote_bitbang failed to make socket: %s (%d)\n", strerror(errno), errno);
         abort();
     }
     fcntl(socket_fd, F_SETFL, O_NONBLOCK);
     int reuseaddr = 1;
-    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
-                   sizeof(int)) == -1)
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int)) == -1)
     {
-        fprintf(stderr, "remote_bitbang failed setsockopt: %s (%d)\n",
-                strerror(errno), errno);
+        fprintf(stderr, "remote_bitbang failed setsockopt: %s (%d)\n", strerror(errno), errno);
         abort();
     }
     struct sockaddr_in addr;
@@ -46,21 +43,18 @@ remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
     addr.sin_port = htons(port);
     if (::bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
     {
-        fprintf(stderr, "remote_bitbang failed to bind socket: %s (%d)\n",
-                strerror(errno), errno);
+        fprintf(stderr, "remote_bitbang failed to bind socket: %s (%d)\n", strerror(errno), errno);
         abort();
     }
     if (listen(socket_fd, 1) == -1)
     {
-        fprintf(stderr, "remote_bitbang failed to listen on socket: %s (%d)\n",
-                strerror(errno), errno);
+        fprintf(stderr, "remote_bitbang failed to listen on socket: %s (%d)\n", strerror(errno), errno);
         abort();
     }
     socklen_t addrlen = sizeof(addr);
     if (getsockname(socket_fd, (struct sockaddr *)&addr, &addrlen) == -1)
     {
-        fprintf(stderr, "remote_bitbang getsockname failed: %s (%d)\n",
-                strerror(errno), errno);
+        fprintf(stderr, "remote_bitbang getsockname failed: %s (%d)\n", strerror(errno), errno);
         abort();
     }
     tck = 1;
@@ -69,8 +63,7 @@ remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
     trstn = 1;
     quit = 0;
     fprintf(stderr, "This emulator compiled with JTAG Remote Bitbang client. To enable, use +jtag_rbb_enable=1.\n");
-    fprintf(stderr, "Listening on port %d\n",
-            ntohs(addr.sin_port));
+    fprintf(stderr, "Listening on port %d\n", ntohs(addr.sin_port));
 }
 
 void remote_bitbang_t::accept()
@@ -85,13 +78,13 @@ void remote_bitbang_t::accept()
         {
             if (errno == EAGAIN)
             {
-                // No client waiting to connect right now.
-                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                // no client waiting to connect right now.
+                fprintf(stderr, "Sleep 600ms\n");
+                std::this_thread::sleep_for(std::chrono::milliseconds(600));
             }
             else
             {
-                fprintf(stderr, "failed to accept on socket: %s (%d)\n", strerror(errno),
-                        errno);
+                fprintf(stderr, "failed to accept on socket: %s (%d)\n", strerror(errno), errno);
                 again = 0;
                 abort();
             }
@@ -99,8 +92,9 @@ void remote_bitbang_t::accept()
         else
         {
             fcntl(client_fd, F_SETFL, O_NONBLOCK);
-            fprintf(stderr, "Accepted successfully\n");
             again = 0;
+
+            fprintf(stderr, "Accepted successfully\n");
         }
     }
 }
@@ -657,6 +651,8 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         std::cout << str << std::endl;
 
                         fprintf(stderr, "\n %s [SINGLE_STEP] Selected harts perform single step requested!\n", str.c_str());
+
+                        dpc += 4;
                     }
 
                     // dm restart requested by writing a 1 into the dmactive bit of the dmcontrol register
@@ -993,7 +989,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
         
                     } else {
 
-                        fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND read regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
+                        fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! RiscV_DTM_Registers::DEBUG_MODULE_INTERFACE_ACCESS ACCESS REGISTER COMMAND read regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
                     }
 
@@ -1079,7 +1075,27 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                         fprintf(stderr, "\nACCESS REGISTER COMMAND regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
-                        if (regno == 0x300) {
+                        // try for one of the registers in the register file. GDB will offset them by 0x1000.
+                        uint32_t regno_without_offset = regno - 0x1000;
+                        if ((regno_without_offset >= 0) && (regno_without_offset <= 31)) {
+
+                            fprintf(stderr, "\nACCESS REGISTER COMMAND found register from the register file\n");
+
+                            if (write == 0) {
+
+                                fprintf(stderr, "reading %s\n", riscv_register_as_string(regno_without_offset).c_str());
+
+                                abstract_data[0] = register_file[regno_without_offset];
+
+                            } else if (write == 1) {
+
+                                fprintf(stderr, "write dpc (0x07b1)\n");
+
+                                fprintf(stderr, "write dpc (0x07b1) written control: 0x%08lx\n", control);
+
+                            }
+
+                        } else if (regno == 0x300) {
 
                             // CSR_MSTATUS register - Zicsr extension
                             //
@@ -1276,7 +1292,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                                 fprintf(stderr, "read dpc (0x07b1)\n");
 
-                                abstract_data[0] = 0x00;
+                                abstract_data[0] = dpc;
 
                             } else if (write == 1) {
 
@@ -1288,7 +1304,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         
                         } else {
 
-                            fprintf(stderr, "\n[ERROR] UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND write regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
+                            fprintf(stderr, "\n[ERROR] Abstract Command (command, at 0x17) - ACCESS REGISTER COMMAND - UNKNOWN REGISTER !!!!! ACCESS REGISTER COMMAND write regno: %" PRIu32 " (0x%04x), ABI-Name: %s\n", regno, regno, riscv_register_as_string(regno).c_str());
 
                         }
                         
@@ -1348,7 +1364,19 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                         } else {
 
-                            fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ READ \n");
+                            if (aamsize == 2) {
+
+                                //arg0 = abstract_data[0];
+                                arg1 = abstract_data[1];
+
+                            } else if (aamsize == 3) {
+
+                                //arg0 = abstract_data[0] << 32 | abstract_data[1];
+                                arg1 = abstract_data[2] << 32 | abstract_data[3];
+
+                            }
+
+                            fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ READ address: 0x%08lx \n", arg1);
 
                         }
 
@@ -1425,7 +1453,8 @@ void remote_bitbang_t::execute_command()
             {
                 // We'll try again the next call.
                 // fprintf(stderr, "Received no command. Will try again on the next call\n");
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                //fprintf(stderr, "Sleep 10ms\n");
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             else
             {
