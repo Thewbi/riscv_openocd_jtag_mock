@@ -41,6 +41,35 @@ int main() {
         ihex_loader.process_hex_line(line);
     }
 
+    std::cout << "START ADDRESS FOR PROGRAM COUNTER: " << std::setfill('0') << std::setw(8) << std::hex << ihex_loader.start_address << std::endl;
+
+    std::map<uint32_t, uint32_t*>::iterator it;
+    for (it = ihex_loader.segments.begin(); it != ihex_loader.segments.end(); it++)
+    {
+        std::cout << "\n" << std::setfill('0') << std::setw(8) << std::hex << it->first << std::endl;
+
+        uint8_t column = 0;
+        for (size_t i = 0; i < 0x4000; i++) {
+
+            if (column == 0) {
+                std::cout << "[" << std::setfill('0') << std::setw(8) << std::hex << i << "] ";
+            }
+
+            uint32_t data = it->second[i];
+            std::cout << std::setfill('0') << std::setw(8) << std::hex << data << " ";
+
+            column++;
+
+            // if (i == 0x1F74/4) {
+            //     std::cout << "boink" << std::endl;
+            // }
+
+            if (column == 8) {
+                std::cout << std::endl;
+                column = 0;
+            }
+        }
+    }
 
     extern tsm_state tsm_current_state;
 

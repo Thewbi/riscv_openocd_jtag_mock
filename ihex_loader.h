@@ -45,9 +45,18 @@ class IHexLoader {
         void print_ihex_type(const IHexType& ihex_type);
 
     public:
-        //std::vector<std::vector<uint32_t>> segments;
         uint32_t current_address = 0x00;
 
+        // this is where the execution should start
+        // read from line types 3 and 5
+        // Write this value to the program counter (pc)
+        // Using this value as a key to the segments property
+        // will return the start of the code to execute.
+        uint32_t start_address = 0x00; 
+
+        // map from EXTENDED_SEGMENT_ADDRESS or EXTENDED_LINEAR_ADDRESS addresses
+        // to a block of 65536 / 4 uint32_t values that contain the data that
+        // the ihex file places into these segments
         std::map<uint32_t, uint32_t*> segments;
 
 };

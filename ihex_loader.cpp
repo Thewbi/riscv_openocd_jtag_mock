@@ -89,13 +89,11 @@ uint8_t IHexLoader::process_hex_line(const std::string& line) {
                 word_read++;
                 
                 if (word_read == 4) {
-                    
-                    //segments.at(current_address).at(address) = word;
 
                     uint32_t absolute_address = current_address | address;
                     std::cout << std::setfill('0') << std::setw(8) << std::hex << +word << " -> " << absolute_address << std::endl;
 
-                    segments.at(current_address)[address] = word;
+                    segments.at(current_address)[address/4] = word;
 
                     word_read = 0;
                     word = 0;
@@ -105,21 +103,37 @@ uint8_t IHexLoader::process_hex_line(const std::string& line) {
             }
 
             if (word_read > 0) {
+
                 uint32_t absolute_address = current_address | address;
                 std::cout << std::setfill('0') << std::setw(8) << std::hex << +word << " -> " << absolute_address << std::endl;
+
+                segments.at(current_address)[address/4] = word;
             }
         }
         break;
 
         case IHexType::EXTENDED_SEGMENT_ADDRESS:
-        case IHexType::START_SEGMENT_ADDRESS:
         case IHexType::EXTENDED_LINEAR_ADDRESS:
-        case IHexType::START_LINEAR_ADDRESS:
         {
-            current_address = 0x00;
             current_address = byte_array.at(4) << 24 | byte_array.at(5) << 16;
         }
         break;
+
+        case IHexType::START_SEGMENT_ADDRESS:
+        case IHexType::START_LINEAR_ADDRESS:
+        {
+            int word_read = 0;
+            uint32_t word = 0;
+            for (size_t i = 4; i < byte_array.size()-2; i++) {
+                word <<= 8;
+                word = word | byte_array.at(i);
+                word_read++;
+                
+                if (word_read == 4) {
+                    start_address = word;
+                }
+            }
+        }
 
         default:
             break;
