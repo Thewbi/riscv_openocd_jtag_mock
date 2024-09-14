@@ -292,7 +292,13 @@ private:
     uint64_t arg1 = 0x00;
     uint64_t arg2 = 0x00;
 
-    uint64_t dpc = 0x00;
+    // debug program counter (this application uses it also for the programm counter of the RISCV chip)
+    //uint64_t dpc = 0x00;
+
+    // initialize to 0x40000000 simply because I found this post: https://stackoverflow.com/questions/69792036/how-do-i-set-up-data-memory-address-when-using-riscv32-64-unknown-elf-gcc
+    // It explains how to generate a ihex file with gcc without linker script that has it's code section at 0x40000000.
+    // The riscv chip will start execution there
+    uint64_t dpc = 0x40000000;
 
     //  case 0, 0x00: return "zero";
     //  case 1, 0x01: return "ra";
