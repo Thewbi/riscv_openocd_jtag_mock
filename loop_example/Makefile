@@ -1,7 +1,7 @@
 # Executed when the make command is used without options
 # build the executable
 .PHONY: all
-all: example.elf
+all: example.elf hex listing dump_text_section
 
 # compile the .c file into a .elf file
 example.elf: example.c

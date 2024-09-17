@@ -4,7 +4,8 @@
 
 #include "remote_bitbang.h"
 #include "tap_state_machine.h"
-#include "ihex_loader.h"
+#include "riscv_assembler/ihex_loader/ihex_loader.h"
+#include "riscv_assembler/cpu/cpu.h"
 
 int main() {
 
@@ -14,66 +15,38 @@ int main() {
     // load ihex file
     //
 
-    std::string ihex_file = "create_binary_example/example.hex";
+    // std::string ihex_file = "create_binary_example/example.hex";
+    // IHexLoader ihex_loader;
 
-    // load a hex file so that openocd does not have to upload data 
-    // since the bitbang protocol is very, very slow and it takes
-    // over a minute to upload 1000 bytes.
-    std::filesystem::path ihex_file_path = std::filesystem::path(ihex_file);
+    // ihex_loader.load_ihex_file(ihex_file);
+    // ihex_loader.debug_output(0x20);
 
-    if (!std::filesystem::exists(ihex_file_path)) {
-        std::cout << ihex_file << " does not exist!" << std::endl;
-        return -1;
-    }
- 
-    std::ifstream ihex_file_ifstream = std::ifstream(ihex_file_path);
-
-    // // DEBUG output ihex file line by line
-    // std::string line;
-    // while (getline(ihex_file_ifstream, line)) {
-    //     std::cout << line << "\n";
-    // }
+    //std::string ihex_file = "test/resources/add_example.hex";
+    std::string ihex_file = "loop_example/example.hex";
 
     IHexLoader ihex_loader;
-
-    std::string line;
-    while (getline(ihex_file_ifstream, line)) {
-        ihex_loader.process_hex_line(line);
+    if (ihex_loader.load_ihex_file(ihex_file)) {
+        return -1;
     }
+    ihex_loader.debug_output(0x20);
 
-    std::cout << "START ADDRESS FOR PROGRAM COUNTER: " << std::setfill('0') << std::setw(8) << std::hex << ihex_loader.start_address << std::endl;
+    cpu_t cpu;
+    cpu_init(&cpu);
+    cpu.pc = ihex_loader.start_address;
+    
+    //cpu.memory = memory;
+    cpu.segments = &(ihex_loader.segments);
 
-    std::map<uint32_t, uint32_t*>::iterator it;
-    for (it = ihex_loader.segments.begin(); it != ihex_loader.segments.end(); it++)
-    {
-        std::cout << "\n" << std::setfill('0') << std::setw(8) << std::hex << it->first << std::endl;
-
-        uint8_t column = 0;
-        for (size_t i = 0; i < 0x4000; i++) {
-
-            if (column == 0) {
-                std::cout << "[" << std::setfill('0') << std::setw(8) << std::hex << i << "] ";
-            }
-
-            uint32_t data = it->second[i];
-            std::cout << std::setfill('0') << std::setw(8) << std::hex << data << " ";
-
-            column++;
-
-            // if (i == 0x1F74/4) {
-            //     std::cout << "boink" << std::endl;
-            // }
-
-            if (column == 8) {
-                std::cout << std::endl;
-                column = 0;
-            }
-        }
-    }
+    // // run the CPU
+    // for (int i = 0; i < 100; i++) {
+    //     if (cpu_step(&cpu)) {
+    //         break;
+    //     }
+    // }
 
     extern tsm_state tsm_current_state;
 
-    remote_bitbang_t remote_bitbang(3335);
+    remote_bitbang_t remote_bitbang(3335, &cpu);
 
     unsigned char jtag_tck = 0;
     unsigned char jtag_tms = 0;

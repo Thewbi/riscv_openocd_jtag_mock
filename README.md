@@ -1,5 +1,39 @@
 # riscv_openocd_jtag_mock
-Linux Server for localhost that openocd with RISC-V support can connect to in bitbanged JTAG
+
+Linux Server for localhost that openocd with RISC-V support can connect to in bitbanged JTAG.
+
+## Improvements
+
+1. Use a build system (meson + ninja) to get rid of relatives include paths.
+1. Remove all C-Code and create C++ classes (e.g. move from the CPU abstract data type (ADT) to a CPU class)
+
+## Submodules
+
+https://github.blog/open-source/git/working-with-submodules/
+
+The https://github.com/Thewbi/riscv_assembler project has been added as a submodule
+because it contains a RISCV emulator that is used to have a simulated debug target
+as otherwise the registers values would not change at all inside the debugger.
+
+```
+git submodule add https://github.com/<user>/<repository> <folder_name>
+git submodule add https://github.com/Thewbi/riscv_assembler riscv_assembler
+```
+
+Older versions of git will not checkout the source code when adding a submodule.
+To be on the safe side explicitly checkout the source code.
+
+```
+git submodule update --init --recursive
+```
+
+Now the submodule's sourcecode is available inside the <folder_name> used when
+the submodule was added. It is now possible to use the sourcecode from the submodule.
+
+The submodule has been checked out on the default branch. If a specific branch is
+required, enter the folder of the submodule and checkout the branch that is required.
+
+
 
 # Compile openocd with RISCV support on Linux
 
@@ -705,13 +739,7 @@ Debug: 981 28972 riscv-013.c:4916 riscv013_get_register(): [riscv.cpu0] reading 
 
 
 
-load_image filename [address ['bin'|'ihex'|'elf'|'s19' [min_address [max_length]]]]
 
-```
-load_image tutorials/de0_nano/hello.elf
-load_image test.hex 0x00000000 ihex
-load_image hello_world_mt.hex 0x00000000 ihex
-``` 
 
 
 
@@ -725,9 +753,25 @@ telnet localhost 4444
 help
 ```
 
+Uploading a .hex file to the target is possible using the load_image command.
+Beware: The upload using bitbanging is extremly slow!
+The better approach is to let the mock load a hex file at startup from disk,
+which is way faster. This is also the approach used with gdb. You pass a .elf
+file to gdb. gdb expects this .elf file (or a .ihex file created from it) to
+be uploaded to the target using another channel other than gdb. gdb will not
+upload any executable to the target!
+
+load_image filename [address ['bin'|'ihex'|'elf'|'s19' [min_address [max_length]]]]
+
 ```
 load_image create_binary_example/example.hex 0x00000000 ihex
 ```
+
+```
+load_image tutorials/de0_nano/hello.elf
+load_image test.hex 0x00000000 ihex
+load_image hello_world_mt.hex 0x00000000 ihex
+``` 
 
 ```
 sleep msec [busy]
@@ -745,12 +789,19 @@ reset halt
 reset init
 soft_reset_halt
 
-# Display contents of address addr, as 64-bit doublewords (mdd), 32-bit words (mdw),
-16-bit halfwords (mdh), or 8-bit bytes (mdb).
+# Display contents of address addr, 
+# as 64-bit doublewords (mdd), 
+# 32-bit words (mdw),
+# 16-bit halfwords (mdh), 
+# or 8-bit bytes (mdb).
 mdd [phys] addr [count]
 mdw [phys] addr [count]
 mdh [phys] addr [count]
 mdb [phys] addr [count]
+
+example:
+
+mdw 0x40000000
 
 # Writes the specified doubleword (64 bits), word (32 bits), halfword (16 bits), or byte
 (8-bit) value, at the specified address addr.
@@ -1864,12 +1915,22 @@ Start gdb:
 
 ```
 /opt/riscv/bin/riscv32-unknown-linux-gnu-gdb /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+/opt/riscv/bin/riscv32-unknown-linux-gnu-gdb /home/wbi/dev/openocd/riscv_openocd_jtag_mock/loop_example/example.elf
 ```
+
+After gdb has been started, the gdb cli is displayed.
+At this point gdb is not yet connected with openocd. 
+A connection has to be established explicitly.
 
 Connect gdb to openocd:
 
 ```
 target remote localhost:3333
+```
+
+For RISC-V debugging use the extended-remote command instead of the remote command!
+
+``` 
 target extended-remote localhost:3333
 ```
 
@@ -1877,6 +1938,19 @@ Query registers
 
 ```
 info registers
+```
+
+Single Step
+
+```
+stepi
+```
+
+To print a variable value, use the print command.
+Say you want to know what value the variable j currently holds:
+
+```
+print j
 ```
 
 Stop gdb:
@@ -1895,7 +1969,13 @@ set arch riscv:rv32
 
 ## OpenOCD
 
+After gdb has been started, the gdb cli is displayed.
+At this point gdb is not yet connected with openocd. 
+A connection has to be established explicitly.
+
+```
 target extended-remote localhost:3333
+```
 
 ## File:
 

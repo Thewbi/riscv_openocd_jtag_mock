@@ -13,12 +13,13 @@
 
 /// @brief constructor
 /// @param port the port for the server to listen on for new connections.
-remote_bitbang_t::remote_bitbang_t(uint16_t port) : socket_fd(0),
+remote_bitbang_t::remote_bitbang_t(uint16_t port, cpu_t* cpu) : socket_fd(0),
                                                     client_fd(0),
                                                     recv_start(0),
                                                     recv_end(0),
                                                     err(0),
-                                                    tsm_state_machine(this)
+                                                    tsm_state_machine(this),
+                                                    cpu(cpu)
 {
     dtmcs_container_register = init_dtmcs();
     dmi_container_register = init_dmi();
@@ -652,7 +653,9 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                         fprintf(stderr, "\n %s [SINGLE_STEP] Selected harts perform single step requested!\n", str.c_str());
 
-                        dpc += 4;
+                        cpu_step(cpu);
+
+                        dpc = cpu->pc;
                     }
 
                     // dm restart requested by writing a 1 into the dmactive bit of the dmcontrol register
@@ -853,7 +856,35 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                 // after this, in the logs of openocd (log level -d4) there should be an output similar to this:
                 // "Debug: 2755 50698 riscv-013.c:411 riscv_log_dmi_scan(): read: dmstatus=0x283 {version=1_0 authenticated=true allhalted=1}"
             
-            } 
+            }
+            // 0x12 == DebugModule 0x12 (Hart Info (hartinfo)) (DebugSpec, https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf, Page 28) - 3.14.1 Debug Module Status
+            else if (dmi_address == 0x12) {
+
+                // This register gives information about the hart currently selected by hartsel.
+                // This register is optional. If it is not present it should read all-zero.
+                // If this register is included, the debugger can do more with the Program Buffer by writing programs which explicitly access the data and/or dscratch registers.
+                // This entire register is read-only
+
+                if (dmi_op == 0x01) {
+
+                    // read operation
+
+                    // this register is optional. If it is not present, return all zero
+
+                    // success, the operation 0x00 used in a response is interpreted by openocd
+                    // as a successfull termination of the requested operation
+                    dmi_op = 0x00;
+
+                    // set a value into the dmi_container_register
+                    dmi_container_register = ((dmi_address & ABITS_MASK) << 34) | 
+                        ((0x00 & 0xFFFFFFFF) << 2) | 
+                        ((dmi_op & 0b11) << 0);
+
+                } else if (dmi_op = 0x02) {
+                    // write operation
+                }
+                
+            }
             // 3.14.6. Abstract Control and Status (abstractcs, at 0x16)
             else if (dmi_address == 0x16) {
 
@@ -1085,7 +1116,7 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                                 fprintf(stderr, "reading %s\n", riscv_register_as_string(regno_without_offset).c_str());
 
-                                abstract_data[0] = register_file[regno_without_offset];
+                                abstract_data[0] = cpu->reg[regno_without_offset];
 
                             } else if (write == 1) {
 
@@ -1366,17 +1397,30 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
 
                             if (aamsize == 2) {
 
-                                //arg0 = abstract_data[0];
                                 arg1 = abstract_data[1];
 
                             } else if (aamsize == 3) {
 
-                                //arg0 = abstract_data[0] << 32 | abstract_data[1];
                                 arg1 = abstract_data[2] << 32 | abstract_data[3];
 
                             }
 
                             fprintf(stderr, "ACCESS_MEMORY_COMMAND +++ READ address: 0x%08lx \n", arg1);
+
+                            // the memory value at the read address is requested from data[0]
+                            //abstract_data[0] = 0xCAFEBABE;
+
+                            uint32_t segment_address = arg1 & 0xFFFF0000;
+                            uint32_t instr_address = arg1 & 0x0000FFFF;
+
+                            // check if the segment is created already otherwise create it
+                            std::map<uint32_t, uint32_t *>::iterator it = cpu->segments->find(segment_address);
+                            if (it == cpu->segments->end()) {
+                                uint32_t* segment_ptr = new uint32_t[16384];
+                                cpu->segments->insert(std::pair<uint32_t, uint32_t*>(segment_address, segment_ptr));
+                            }
+
+                            abstract_data[0] = cpu->segments->at(segment_address)[instr_address/4];
 
                         }
 
@@ -1396,11 +1440,15 @@ void remote_bitbang_t::state_entered(tsm_state new_state, uint8_t rising_edge_cl
                         // (incremented) address to dmi_data and from dmi_data
                         // into abstract_data[1]
                         //
-                        // abstract_data[1] is then return when data1 (abstract_data[1])
-                        // is read. When the external debugger retrieves an incremented
+                        // abstract_data[1] is returned when data1 (abstract_data[1])
+                        // is read. 
+                        //
+                        // When the external debugger retrieves an incremented
                         // address, it knows that the auto-increment (aampostincrement) feature
                         // is implemented
                         abstract_data[1] = dmi_data;
+
+                        
                         
                     }
 
@@ -1454,7 +1502,7 @@ void remote_bitbang_t::execute_command()
                 // We'll try again the next call.
                 // fprintf(stderr, "Received no command. Will try again on the next call\n");
                 //fprintf(stderr, "Sleep 10ms\n");
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                //std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             else
             {
@@ -2061,6 +2109,50 @@ std::string remote_bitbang_t::riscv_register_as_string(uint32_t register_index) 
         // 0x318 MRW 32 mvienh Upper 32 bits of mvien (only with S-mode)
         // 0x319 MRW 32 mviph Upper 32 bits of mvip (only with S-mode)
         // 0x354 MRW 32 miph Upper 32 bits of mip
+
+        //
+        // ZICSR extesnsion
+        //
+
+        // https://www.five-embeddev.com/riscv-priv-isa-manual/latest-adoc/priv-csrs.html
+        // https://xhypervisor.org/pdf/Xvisor_Embedded_Hypervisor_for_RISCV_v5.pdf
+
+        // https://riscv.org/technical/specifications/
+        // https://drive.google.com/file/d/17GeetSnT5wW3xNuAHI95-SI1gPGd5sJ_/view
+
+        // Privileged Hypervisor CSR addresses. from gdb/include/opcode/riscv-opc.h
+        // #define CSR_HSTATUS 0x600
+        // #define CSR_HEDELEG 0x602
+        // #define CSR_HIDELEG 0x603
+        // #define CSR_HIE 0x604
+        // #define CSR_HCOUNTEREN 0x606
+        // #define CSR_HGEIE 0x607
+        // #define CSR_HTVAL 0x643
+        // #define CSR_HIP 0x644
+        // #define CSR_HVIP 0x645
+        // #define CSR_HTINST 0x64a
+        // #define CSR_HGEIP 0xe12
+        // #define CSR_HENVCFG 0x60a
+        // #define CSR_HENVCFGH 0x61a
+        // #define CSR_HGATP 0x680
+        // #define CSR_HTIMEDELTA 0x605
+        // #define CSR_HTIMEDELTAH 0x615
+        case 0x600: return "CSR_HSTATUS"; // hypervisor status register, https://five-embeddev.com/riscv-priv-isa-manual/Priv-v1.12/priv-csrs.html
+        case 0x602: return "CSR_HEDELEG"; // hypervisor exception delegation register
+        case 0x603: return "CSR_HIDELEG"; // hypervisor interrupt delegation register
+        case 0x604: return "CSR_HIE"; // hypervisor interrupt-enable register
+        case 0x606: return "CSR_HCOUNTEREN"; // hypervisor counter enable
+        case 0x607: return "CSR_HGEIE"; // hypervisor guest external interrupt-enable register
+        case 0x643: return "CSR_HTVAL"; // hypervisor bad guest physical address
+        case 0x644: return "CSR_HIP"; // hypervisor interrupt pending
+        case 0x645: return "CSR_HVIP"; // hypervisor virtual interrupt pending
+        case 0x64a: return "CSR_HTINST"; // hypervisor trap instruction (transformed)
+        case 0xe12: return "CSR_HGEIP"; // hypervisor guest external interrupt pending
+        case 0x60a: return "CSR_HENVCFG"; // hypervisor evironment configuration register
+        case 0x61a: return "CSR_HENVCFGH"; // additional hypervisor evironment configuration register (RV32 only)
+        case 0x680: return "CSR_HGATP"; // hypervisor guest translation and protection
+        case 0x605: return "CSR_HTIMEDELTA"; // delta for VS/VU mode timer
+        case 0x615: return "CSR_HTIMEDELTAH"; // upper 32 bit of htimedelta, HSXLEN=32 only
 
         
 

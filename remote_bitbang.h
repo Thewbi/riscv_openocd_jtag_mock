@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "tap_state_machine.h"
+#include "riscv_assembler/cpu/cpu.h"
 
 // // instructions / register indexes
 // enum class Instruction : uint8_t {
@@ -72,11 +73,14 @@ public:
     /// @brief Constructor. Creates a new server, listening for connections from localhost on the given
     // port.
     /// @param port the port where the server listens on for incoming JTAG bitbang connections (from openocd for example)
-    remote_bitbang_t(uint16_t port);
+    remote_bitbang_t(uint16_t port, cpu_t* cpu);
 
     /// @brief Called by the driver (main()) in an endless loop as long as the server has not received
     /// a quit command. Acts as the interface between the verilator implementation and the JTAG server.
-    /// mainly calls execute_command() which parses the incoming command and executes specific handlers.
+    ///
+    /// First waits for a openocd JTAG bitbang client connection.
+    /// Once a client has connected, calls execute_command() which parses the incoming command and 
+    /// executes specific handlers.
     ///
     /// @param jtag_tck out - JTAG bitbang 'clock' signal sent by the JTAG client. Goes out to the FPAG system.
     /// @param jtag_tms out - JTAG bitbang 'mode select' signal sent by the JTAG client. Goes out to the FPAG system.
@@ -332,7 +336,9 @@ private:
     // case 29, 0x1D: return "t4";
     // case 30, 0x1E: return "t5";
     // case 31, 0x1F: return "t6";
-    uint32_t register_file[32]{0};
+    //uint32_t register_file[32]{0};
+
+    cpu_t* cpu;
 
 };
 

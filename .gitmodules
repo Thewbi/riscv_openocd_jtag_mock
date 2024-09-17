@@ -1,0 +1,3 @@
+[submodule "riscv_assembler"]
+	path = riscv_assembler
+	url = https://github.com/Thewbi/riscv_assembler

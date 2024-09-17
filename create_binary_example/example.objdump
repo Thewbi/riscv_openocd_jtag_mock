@@ -1,0 +1,36 @@
+
+example.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+40000000 <main>:
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -march=rv32id -g example.c -o example.elf
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -v -march=rv32id -nostartfiles -x c -Ttext 40000000 -Tdata 50000000 -Tbss 60000000 -o example.elf example.c
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc -Wa,-adhln -g example.c > assembly_list.s
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-objcopy -O ihex example.elf example.hex
+// /opt/riscv/bin/riscv32-unknown-linux-gnu-objdump -s -j .text /home/wbi/dev/openocd/riscv_openocd_jtag_mock/create_binary_example/example.elf
+int main() {
+40000000:	fe010113          	addi	sp,sp,-32
+40000004:	00812e23          	sw	s0,28(sp)
+40000008:	02010413          	addi	s0,sp,32
+
+    int anumber = 5;
+4000000c:	00500793          	li	a5,5
+40000010:	fef42623          	sw	a5,-20(s0)
+    int another = 30;
+40000014:	01e00793          	li	a5,30
+40000018:	fef42423          	sw	a5,-24(s0)
+
+    int result = anumber + another;
+4000001c:	fec42703          	lw	a4,-20(s0)
+40000020:	fe842783          	lw	a5,-24(s0)
+40000024:	00f707b3          	add	a5,a4,a5
+40000028:	fef42223          	sw	a5,-28(s0)
+
+    return result;
+4000002c:	fe442783          	lw	a5,-28(s0)
+40000030:	00078513          	mv	a0,a5
+40000034:	01c12403          	lw	s0,28(sp)
+40000038:	02010113          	addi	sp,sp,32
+4000003c:	00008067          	ret
